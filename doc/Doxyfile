@@ -1,0 +1,17 @@
+PROJECT_NAME           = "OTPQCOM"
+OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@
+
+INPUT                  = ../otpqcom/include ../otpqcom/src
+FILE_PATTERNS          = *.h *.cpp
+RECURSIVE              = YES
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
