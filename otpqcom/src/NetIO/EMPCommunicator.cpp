@@ -1,11 +1,12 @@
 #include <otpqcom/NetIO/EMPCommunicator.h>
 #include <stdexcept>
 #include <cstring>
+#include <utility>
 
 namespace otpq::network {
 
-    EMPCommunicator::EMPCommunicator(const NodeNetworkConfig &config)
-        : m_config(config) {
+    EMPCommunicator::EMPCommunicator(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers)
+        : m_self(std::move(self)), m_peers(peers.begin(), peers.end()) {
         // TODO: Initialize emp::NetIO here (server/client setup).
         // Example:
         // m_io = std::make_unique<emp::NetIO>(config.ip().c_str(), config.base_port());

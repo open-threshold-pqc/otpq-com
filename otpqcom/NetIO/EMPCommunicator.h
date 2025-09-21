@@ -12,7 +12,7 @@ namespace otpq::network {
     class EMPCommunicator final : public Communicator {
     public:
         /// Construct an EMP communicator for the given node configuration.
-        explicit EMPCommunicator(const NodeNetworkConfig &config);
+        explicit EMPCommunicator(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers);
 
         /// Destroy communicator and clean up EMP resources.
         ~EMPCommunicator() override;
@@ -26,6 +26,7 @@ namespace otpq::network {
         std::vector<std::byte> recv(const NodeNetworkConfig &peer) override;
 
     private:
-        NodeNetworkConfig m_config; ///< This node's configuration.
+        NodeNetworkConfig m_self; ///< This node's configuration.
+        std::vector<NodeNetworkConfig> m_peers; //
     };
 } // namespace otpq::network

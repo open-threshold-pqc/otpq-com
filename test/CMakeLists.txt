@@ -13,6 +13,10 @@ add_executable(NodeNetworkConfig_test NodeNetworkConfig_test.cpp)
 target_link_libraries(NodeNetworkConfig_test PRIVATE otpqcomlib GTest::gtest_main)
 
 
+add_executable(EMPNetIOChannel_test EMPNetIOChannel_test.cpp)
+target_link_libraries(EMPNetIOChannel_test PRIVATE otpqcomlib GTest::gtest_main)
+
+
 add_executable(EMPCommunicator_test EMPCommunicator_test.cpp)
 target_link_libraries(EMPCommunicator_test PRIVATE otpqcomlib GTest::gtest_main)
 

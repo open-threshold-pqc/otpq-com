@@ -10,7 +10,8 @@ TEST(EMPCommunicatorTest, ValidConstruction) {
     const NodeNetworkConfig cfg{1, "127.0.0.1", 9000};
     NodeNetworkConfig peer{1, "127.0.0.1", 9000};
 
-    emp::network::EMPNetIOChannel channel{cfg, true};
+    emp::network::EMPNetIOChannel channel{cfg, emp::network::EMPNetworkNodeType::SERVER};
+    channel.nodeListen();
     // EMPCommunicator emp_comm{cfg};
 
 }
