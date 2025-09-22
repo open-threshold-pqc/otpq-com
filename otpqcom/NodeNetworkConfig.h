@@ -43,9 +43,9 @@ namespace otpq::network {
         [[nodiscard]] int base_port() const noexcept;
 
     private:
-        int m_id;             ///< Unique node identifier.
-        std::string m_ip;     ///< IP address of the node.
-        int m_base_port;      ///< Base port number.
+        int id_;             ///< Unique node identifier.
+        std::string ip_;     ///< IP address of the node.
+        int basePort_;      ///< Base port number.
     };
 
 } // namespace otpq::network

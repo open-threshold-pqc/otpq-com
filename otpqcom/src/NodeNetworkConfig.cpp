@@ -3,26 +3,27 @@
 
 namespace otpq::network {
     NodeNetworkConfig::NodeNetworkConfig(const int id, const std::string_view ip, const int base_port)
-        : m_id(id), m_ip(ip), m_base_port(base_port) {
+        : id_(id), ip_(ip), basePort_(base_port) {
         if (id <= 0)
             throw std::invalid_argument(
                 std::format("[NodeNetworkConfig]: invalid id={} (must be > 0)", id));
 
-        if (base_port < 1024) {
+        // Allow 0
+        if (base_port < 1024 && base_port != 0) {
             throw std::invalid_argument(
                 std::format("[NodeNetworkConfig]: invalid base_port={} (must be >= 1024)", base_port));
         }
     }
 
     int NodeNetworkConfig::id() const noexcept {
-        return m_id;
+        return id_;
     }
 
     std::string_view NodeNetworkConfig::ip() const noexcept {
-        return m_ip;
+        return ip_;
     }
 
     int NodeNetworkConfig::base_port() const noexcept {
-        return m_base_port;
+        return basePort_;
     }
 } // namespace otpq::network

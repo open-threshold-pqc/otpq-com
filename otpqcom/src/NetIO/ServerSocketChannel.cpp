@@ -1,10 +1,11 @@
-#include "otpqcom/NetIO/ServerSocketChannel.h"
 #include <format>
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <otpqcom/NetworkConfig.h>
+#include <otpqcom/NetIO/ServerSocketChannel.h>
 
 namespace otpq::network::sockets {
     ServerSocketChannel::ServerSocketChannel(NodeNetworkConfig cfg)
@@ -13,81 +14,95 @@ namespace otpq::network::sockets {
     }
 
     ServerSocketChannel::~ServerSocketChannel() {
-        // flush();
-        // if (stream_) {
-        //     fclose(stream_);
-        // }
-        if (connSocket_ >= 0) {
-           close(connSocket_);
+        if (stream_) {
+            streamFlush();
+            fclose(stream_);
         }
+
+        if (listenSocket_ >= 0)
+            close(listenSocket_);
+
+        if (connSocket_ >= 0)
+            close(connSocket_);
     }
 
-    void ServerSocketChannel::beginListen() {
-        if (listen(connSocket_, 1) < 0)
+    void ServerSocketChannel::awaitConnection() const {
+        if (listen(listenSocket_, 1) < 0)
             throw std::runtime_error(std::format("[ServerSocketChannel]: Server listen() failed ({}, {}) ",
                                                  netcfg_.ip(),
                                                  netcfg_.base_port()));
+    }
+
+    void ServerSocketChannel::acceptConnection() {
+        //todo check for previous open connection
 
         sockaddr_in peerSocket{};
         socklen_t peerSocketSize = sizeof(peerSocket);
-        const int peerConnSocket = accept(connSocket_, reinterpret_cast<sockaddr *>(&peerSocket), &peerSocketSize);
-        if (peerConnSocket < 0)
+        connSocket_ = accept(listenSocket_, reinterpret_cast<sockaddr *>(&peerSocket), &peerSocketSize);
+        if (connSocket_ < 0)
             throw std::runtime_error(std::format("[ServerSocketChannel]: Server accept() failed ({}, {}) ",
                                                  netcfg_.ip(),
                                                  netcfg_.base_port()));
-        close(connSocket_);
-        connSocket_ = peerConnSocket;
+
+        stream_ = fdopen(connSocket_, "wb+");
+        if (!stream_)
+            throw std::runtime_error("[ServerSocketChannel]: Server acceptConnection() failed creating an IO channel");
+
+        if (setvbuf(stream_, reinterpret_cast<char *>(buffer_.get()),
+                    static_cast<int>(NetworkBufferMode::FullyBuffered),
+                    NETWORK_IO_BUFFER_SIZE) != 0)
+            throw std::runtime_error(
+                "[ServerSocketChannel]: acceptConnection() failed allocating buffer for IO stream");
+    }
+
+    void ServerSocketChannel::awaitAndServe() {
+        awaitConnection();
+        acceptConnection();
     }
 
     void ServerSocketChannel::sendData(const void *data, std::size_t len) {
-        // std::size_t sent = 0;
-        // const auto *buf = static_cast<const char *>(data);
-        //
-        // while (sent < len) {
-        //     const auto res = fwrite(buf + sent, 1, len - sent, stream_);
-        //     if (res > 0) {
-        //         sent += res;
-        //     } else {
-        //         throw std::runtime_error("[SocketServer]: send failed");
-        //     }
-        // }
-        // hasSent_ = true;
+        if (!stream_)
+            throw std::runtime_error("[ServerSocketChannel] sendData() failed. No IO stream exists.");
+
+        std::size_t dataSentBytes = 0;
+
+        while (dataSentBytes < len) {
+            const auto sendResult = fwrite(static_cast<const char *>(data) + dataSentBytes, 1, len - dataSentBytes,
+                                           stream_);
+            if (sendResult == 0)
+                throw std::runtime_error(std::format("[ServerSocketChannel] sendData() failed at byte {}/{}",
+                                                     dataSentBytes, len));
+
+            dataSentBytes += sendResult;
+        }
     }
 
     void ServerSocketChannel::recvData(void *data, std::size_t len) {
+        if (!stream_)
+            throw std::runtime_error("[ServerSocketChannel] recvData() failed. No IO stream exists.");
+
+        fflush(stream_);
+
         // if (hasSent_) {
-        //     fflush(stream_);
         // }
         // hasSent_ = false;
-        //
-        // std::size_t received = 0;
-        // auto *buf = static_cast<char *>(data);
-        //
-        // while (received < len) {
-        //     const auto res = fread(buf + received, 1, len - received, stream_);
-        //     if (res > 0) {
-        //         received += res;
-        //     } else {
-        //         throw std::runtime_error("[SocketServer]: recv failed");
-        //     }
-        // }
+
+        std::size_t dataReceivedBytes{};
+
+        while (dataReceivedBytes < len) {
+            if (const auto res = fread(static_cast<char *>(data) + dataReceivedBytes, 1, len - dataReceivedBytes,
+                                       stream_); res > 0)
+                dataReceivedBytes += res;
+            else
+                throw std::runtime_error(std::format("[ServerSocketChannel] recvData() failed at byte {}/{}",
+                                                     dataReceivedBytes, len));
+        }
     }
 
-    // void SocketServer::setNoDelay() {
-    //     constexpr int one{1};
-    //     setsockopt(connSocket_, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-    // }
-    //
-    // void SocketServer::setDelay() {
-    //     const int zero = 0;
-    //     setsockopt(connSocket_, IPPROTO_TCP, TCP_NODELAY, &zero, sizeof(zero));
-    // }
-    //
-    // void SocketServer::flush() {
-    //     if (stream_) {
-    //         fflush(stream_);
-    //     }
-    // }
+    void ServerSocketChannel::streamFlush() const {
+        if (stream_)
+            fflush(stream_);
+    }
 
     void ServerSocketChannel::setupServer() {
         sockaddr_in serv{};
@@ -98,25 +113,16 @@ namespace otpq::network::sockets {
 
         serv.sin_port = htons(netcfg_.base_port());
 
-        connSocket_ = socket(AF_INET, SOCK_STREAM, 0);
-        if (connSocket_ < 0)
+        listenSocket_ = socket(AF_INET, SOCK_STREAM, 0);
+        if (listenSocket_ < 0)
             throw std::runtime_error(std::format("[ServerSocketChannel]: Server socket() failed ({}, {}) ",
                                                  netcfg_.ip(),
                                                  netcfg_.base_port()));
 
-        setOption(SocketOptions::REUSEADDR);
+        setOption(listenSocket_, SocketOptions::REUSEADDR);
 
-        if (bind(connSocket_, reinterpret_cast<sockaddr *>(&serv), sizeof(serv)) < 0)
+        if (bind(listenSocket_, reinterpret_cast<sockaddr *>(&serv), sizeof(serv)) < 0)
             throw std::runtime_error(std::format("[ServerSocketChannel]: Server bind() failed ({}, {}) ", netcfg_.ip(),
                                                  netcfg_.base_port()));
-    }
-
-    void ServerSocketChannel::setOption(const SocketOptions opt) const {
-        if (opt == SocketOptions::REUSEADDR) {
-            constexpr int reuse{1};
-            setsockopt(connSocket_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-        } else
-            throw std::runtime_error(
-                "[ServerSocketChannel]: setOption(), option is invalid/unsupported for this socket");
     }
 } // namespace otpq::network
