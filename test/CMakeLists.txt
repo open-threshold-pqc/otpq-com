@@ -13,8 +13,14 @@ add_executable(NodeNetworkConfig_test NodeNetworkConfig_test.cpp)
 target_link_libraries(NodeNetworkConfig_test PRIVATE otpqcomlib GTest::gtest_main)
 
 
-add_executable(EMPNetIOChannel_test EMPNetIOChannel_test.cpp)
-target_link_libraries(EMPNetIOChannel_test PRIVATE otpqcomlib GTest::gtest_main)
+add_executable(SocketChannel_test SocketChannel_test.cpp)
+target_link_libraries(SocketChannel_test PRIVATE otpqcomlib GTest::gtest_main)
+
+add_executable(SocketChannelServer_test SocketChannelServer_test.cpp)
+target_link_libraries(SocketChannelServer_test PRIVATE otpqcomlib GTest::gtest_main)
+
+add_executable(SocketChannelClient_test SocketChannelClient_test.cpp)
+target_link_libraries(SocketChannelClient_test PRIVATE otpqcomlib GTest::gtest_main)
 
 
 add_executable(EMPCommunicator_test EMPCommunicator_test.cpp)

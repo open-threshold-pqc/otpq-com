@@ -7,8 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # === Individual libs ===
 add_library(otpqcomlib
         otpqcom/src/NodeNetworkConfig.cpp
-        otpqcom/src/NetIO/EMPCommunicator.cpp
-        otpqcom/src/NetIO/EMPNetIOChannel.cpp)
+        otpqcom/src/NetIO/ClientSocketChannel.cpp
+        otpqcom/src/NetIO/ServerSocketChannel.cpp)
+
 target_include_directories(otpqcomlib
         PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>
