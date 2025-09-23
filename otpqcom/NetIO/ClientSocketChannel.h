@@ -2,99 +2,103 @@
 
 #include <otpqcom/NodeNetworkConfig.h>
 #include <otpqcom/NetIO/SocketChannel.h>
+#include <otpqcom/NetworkConfig.h>
 
 namespace otpq::network::sockets {
-
     /**
      * @class ClientSocketChannel
-     * @brief A concrete implementation of the SocketChannel class for client-side socket communication.
+     * @brief Client-side implementation of SocketChannel.
      *
-     * This class extends the `SocketChannel` base class to implement socket communication for a client.
-     * It provides specific implementations for the `sendData` and `recvData` methods, as well as additional
-     * functionality to connect to a server and manage the client socket.
+     * Provides socket communication for clients, including send/receive operations
+     * and the ability to connect to a remote node. Instances are non-copyable
+     * but movable, enforcing unique ownership of the underlying socket.
      */
     class ClientSocketChannel final : public SocketChannel {
     public:
         /**
-         * @brief Constructs a ClientSocketChannel with the specified network configuration.
-         *
-         * This constructor initializes the `ClientSocketChannel` with the given network configuration,
-         * and sets up the client socket.
-         *
-         * @param cfg The network configuration (e.g., address, port) for this client socket.
+         * @brief Construct a client socket channel with the given configuration.
+         *        The constructor allocates the socket and binds to the given network configuration.
+         * @param cfg Local network configuration (IP, port, etc.).
+         * @throw std::runtime_error if socket creation or bind fails.
          */
         explicit ClientSocketChannel(NodeNetworkConfig cfg);
 
         /**
-         * @brief Destructor that performs necessary cleanup.
+         * @brief Destructor.
          *
-         * Ensures proper cleanup of resources when the `ClientSocketChannel` object is destroyed.
+         * Flushes and closes the stream (if open) and closes the socket descriptor.
          */
-        ~ClientSocketChannel();
+        ~ClientSocketChannel() override;
 
         /**
-         * @brief Sends data over the client socket.
+         * @brief Connect to a remote node.
          *
-         * This method is used to send data over the socket. It overrides the pure virtual `sendData`
-         * method from `SocketChannel`.
+         * Retries until a connection succeeds. Once connected, sets up a
+         * buffered FILE* stream for I/O.
          *
-         * @param data A pointer to the data that should be sent.
-         * @param len The length of the data to send.
+         * @param cfg Remote node configuration (IP, port).
+         * @throw std::runtime_error if stream setup fails.
+         */
+        void nodeConnect(const NodeNetworkConfig &cfg);
+
+        /**
+         * @brief Configure the buffering mode of the I/O stream.
+         *
+         * Allows adjusting how data is buffered when reading/writing
+         * through the underlying `FILE*` stream created after a client
+         * connection is accepted.
+         *
+         * Supported modes:
+         * - NetworkBufferMode::FullyBuffered — buffer entire blocks of data
+         * - NetworkBufferMode::LineBuffered  — flush on newline
+         * - NetworkBufferMode::Unbuffered    — no buffering (immediate write)
+         *
+         * @param mode The buffering mode to apply.
+         * @throws std::runtime_error if the stream is not yet initialized or
+         *         if applying the new buffer mode fails.
+         *
+         * @note Must be called after a connection has been accepted, since
+         *       the underlying stream does not exist before that point.
+         */
+        void setBufferMode(NetworkBufferMode mode) const;
+
+        /**
+         * @brief Send data to the connected node.
+         * Retries until all bytes are sent.
+         * @param data Pointer to the data buffer.
+         * @param len  Number of bytes to send.
+         * @throw std::runtime_error on failure.
          */
         void sendData(const void *data, std::size_t len) override;
 
         /**
-         * @brief Receives data from the client socket.
-         *
-         * This method is used to receive data over the socket. It overrides the pure virtual `recvData`
-         * method from `SocketChannel`.
-         *
-         * @param data A pointer to the buffer where the received data will be stored.
-         * @param len The size of the buffer to receive data into.
+         * @brief Receive data from the connected node.
+         * Retries until all requested bytes are read.
+         * @param data Pointer to the destination buffer.
+         * @param len  Buffer size in bytes.
+         * @throw std::runtime_error on failure.
          */
         void recvData(void *data, std::size_t len) override;
 
-        void streamFlush() const;
-
         /**
-         * @brief Connects the client socket to a remote node.
-         *
-         * This method is used to initiate a connection to a remote server or node using the specified
-         * network configuration.
-         *
-         * @param cfg The network configuration (e.g., remote address, port) of the remote node to connect to.
+         * @brief Flush the buffered I/O stream.
+         * @throw std::runtime_error if flush fails.
          */
-        void nodeConnect(const NodeNetworkConfig &cfg);
+        void streamFlush() const;
 
     private:
         /**
-         * @brief Initializes the client socket.
+         * @brief Initialize the client socket.
          *
-         * Sets up the necessary configurations for the client socket, such as socket options and connection
-         * initialization. This is called internally during the constructor.
+         * Creates a TCP socket, applies socket options, and binds to the local address.
+         * @throw std::runtime_error if socket creation or bind fails.
          */
         void setupClient();
 
-        /**
-         * @brief A flag indicating if the client has already sent data.
-         *
-         * This boolean flag is used to track whether the client has already sent data, to manage
-         * connection behavior or retries if necessary.
-         */
-        bool hasSent_{false};
+        /// Buffered I/O stream (created after connection).
+        FILE *stream_{nullptr};
 
-
-        /**
-         * @brief A stream pointer for any necessary file operations related to the socket.
-         */
-        FILE *stream_{};
-
-        /**
-         * @brief The socket descriptor.
-         *
-         * This represents the actual socket that the operating system uses to interact with the network.
-         * It is initialized to -1 to indicate that the socket is not yet open.
-         */
+        /// OS-level socket descriptor (-1 if not initialized).
         int connSocket_{-1};
     };
 } // namespace otpq::network::sockets

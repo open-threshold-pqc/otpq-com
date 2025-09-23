@@ -7,85 +7,83 @@
 namespace otpq::network::sockets {
 
     /**
-     * @brief Enum class that defines various socket options.
+     * @enum SocketOptions
+     * @brief Configurable options for a socket.
+     *
+     * Use with SocketChannel::setOption() to control OS-level behavior.
      */
     enum class SocketOptions {
-        REUSEADDR, ///< Option to allow reuse of local addresses.
-        SETDELAY,  ///< Option to enable delay for TCP connections.
-        SETNODELAY ///< Option to disable delay for TCP connections (Nagle's algorithm).
+        REUSEADDR, ///< Allow reuse of local addresses (SO_REUSEADDR).
+        SETDELAY,  ///< Enable delayed sends (Nagle’s algorithm enabled).
+        SETNODELAY ///< Disable delayed sends (Nagle’s algorithm disabled).
     };
 
     /**
      * @class SocketChannel
-     * @brief A base class representing a socket channel with virtual methods for sending, receiving data,
-     *        and setting socket options.
+     * @brief Abstract base class for all socket communication channels.
      *
-     * This class provides the necessary structure for handling socket communications.
-     * Derived classes are expected to implement the `sendData` and `recvData` methods to perform the actual
-     * sending and receiving operations.
+     * Provides the common interface for sending/receiving data and configuring sockets.
+     * Classes derived from SocketChannel (e.g., ServerSocketChannel, ClientSocketChannel)
+     * implement the transport-specific logic. Each socket will be handling one connection at a time.
+     *
+     * @note This type is move-only: copy operations are disabled, but move is supported.
+     *       This enforces unique ownership of the underlying OS socket.
      */
     class SocketChannel {
     public:
         /**
-         * @brief Constructs a SocketChannel with the given network configuration.
-         *
-         * @param cfg The configuration object containing network settings for the socket.
+         * @brief Construct a socket channel with the given configuration.
+         * @param cfg Network configuration (e.g., IP address and port).
          */
         explicit SocketChannel(NodeNetworkConfig cfg);
 
+        /// Deleted copy operations (enforces unique ownership).
+        SocketChannel(const SocketChannel&) = delete;
+        SocketChannel& operator=(const SocketChannel&) = delete;
+
+        /// Defaulted move operations (transfer ownership).
+        SocketChannel(SocketChannel&&) noexcept = default;
+        SocketChannel& operator=(SocketChannel&&) noexcept = default;
+
         /**
-         * @brief Destructor that performs necessary cleanup. Ensures the socket is closed if it was opened.
+         * @brief Virtual destructor.
+         *
+         * Ensures proper cleanup of resources (e.g., closing sockets).
          */
         virtual ~SocketChannel();
 
         /**
-         * @brief Sends data over the socket.
-         *
-         * This is a pure virtual method. Derived classes must provide their implementation for sending data.
-         *
-         * @param data A pointer to the data to send.
-         * @param len The length of the data to send.
-         * @throws std::runtime_error if not implemented by the derived class.
+         * @brief Send data over the socket.
+         * @param data Pointer to the bytes to send.
+         * @param len  Number of bytes to send.
+         * @throw std::runtime_error on failure.
          */
         virtual void sendData(const void *data, std::size_t len) = 0;
 
         /**
-         * @brief Receives data from the socket.
-         *
-         * This is a pure virtual method. Derived classes must provide their implementation for receiving data.
-         *
-         * @param data A pointer to the buffer where received data will be stored.
-         * @param len The length of the buffer.
-         * @throws std::runtime_error if not implemented by the derived class.
+         * @brief Receive data from the socket.
+         * @param data Pointer to the destination buffer.
+         * @param len  Buffer size in bytes.
+         * @throw std::runtime_error on failure.
          */
         virtual void recvData(void *data, std::size_t len) = 0;
 
     protected:
         /**
-         * @brief Sets socket options, such as address reuse and TCP_NODELAY.
+         * @brief Apply a socket option.
+         * @param connSocket File descriptor of the socket.
+         * @param opt Option to apply.
          *
-         * This method allows derived classes to configure socket-level options for the connection.
-         *
-         * @param connSocket
-         * @param opt The socket option to set (e.g., REUSEADDR, SETDELAY, SETNODELAY).
-         * @throws std::invalid_argument if an unknown option is passed.
-         * @throws std::runtime_error if setting the socket option fails.
+         * @throw std::invalid_argument if @p opt is invalid.
+         * @throw std::runtime_error if the system call fails.
          */
         static void setOption(int connSocket, SocketOptions opt);
 
-        /**
-         * @brief The network configuration for this socket.
-         *
-         * Holds the settings for the socket connection, such as the IP address and port.
-         */
+        /// Network configuration for this socket (IP, port, etc.).
         NodeNetworkConfig netcfg_;
 
-        /**
-         * @brief A buffer used for sending and receiving data.
-         *
-         * Allocates a buffer to hold data being sent or received via the socket.
-         */
+        /// Buffer for send/receive operations.
         std::unique_ptr<uint8_t[]> buffer_;
-
     };
+
 } // namespace otpq::network::sockets

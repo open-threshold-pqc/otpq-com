@@ -29,9 +29,9 @@ namespace otpq::network {
          *
          * \param id Unique node identifier.
          * \param ip IP address of the node.
-         * \param base_port Base port number to use for communication.
+         * \param basePort Base port number to use for communication.
          */
-        NodeNetworkConfig(int id, std::string_view ip, int base_port);
+        NodeNetworkConfig(int id, std::string_view ip, int basePort);
 
         /// @return The unique node identifier.
         [[nodiscard]] int id() const noexcept;
@@ -42,10 +42,20 @@ namespace otpq::network {
         /// @return The node's base port.
         [[nodiscard]] int base_port() const noexcept;
 
+
     private:
         int id_;             ///< Unique node identifier.
         std::string ip_;     ///< IP address of the node.
         int basePort_;      ///< Base port number.
     };
+
+
+    /**
+     * \brief Check if a string is a valid IPv4 or IPv6 address.
+     *
+     * @param ip The IP address string to validate.
+     * @return true if valid, false otherwise.
+     */
+    [[nodiscard]] inline bool isValidIp(std::string_view ip) noexcept;
 
 } // namespace otpq::network
