@@ -29,8 +29,8 @@ add_library(libotpqcom
         otpqcom/src/NetIO/SocketChannel.cpp
         otpqcom/src/NetIO/ClientSocketChannel.cpp
         otpqcom/src/NetIO/ServerSocketChannel.cpp
-        otpqcom/src/NetIO/MPCommunication.cpp
-        otpqcom/src/NetIO/SocketMPCommunication.cpp
+        otpqcom/src/NetIO/MPChannel.cpp
+        otpqcom/src/NetIO/SocketMPChannel.cpp
 )
 
 target_include_directories(libotpqcom

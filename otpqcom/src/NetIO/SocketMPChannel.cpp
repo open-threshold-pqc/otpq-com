@@ -3,12 +3,12 @@
 #include <utility>
 #include <iostream>
 
-#include <otpqcom/NetIO/SocketMPCommunication.h>
+#include <otpqcom/NetIO/SocketMPChannel.h>
 
 namespace otpq::network {
-    SocketMPCommunication::SocketMPCommunication(NodeNetworkConfig self,
+    SocketMPChannel::SocketMPChannel(NodeNetworkConfig self,
                                                  std::span<NodeNetworkConfig> peers)
-        : MPCommunication(std::move(self), peers) {
+        : MPChannel(std::move(self), peers) {
         /* Server role: handle peers with smaller IDs */
         for (const auto &peer: peers_) {
             if (peer.id() < netcfg_.id()) {
@@ -47,10 +47,10 @@ namespace otpq::network {
         }
     }
 
-    SocketMPCommunication::~SocketMPCommunication() = default;
+    SocketMPChannel::~SocketMPChannel() = default;
 
     std::expected<std::size_t, std::string>
-    SocketMPCommunication::sendData(const int peerId, const void *data, std::size_t len) {
+    SocketMPChannel::sendData(const int peerId, const void *data, std::size_t len) {
         return withPeerSocket(peerId, [&](auto &socket) -> std::expected<std::size_t, std::string> {
             auto res = socket.sendData(data, len);
             if (!res) {
@@ -63,7 +63,7 @@ namespace otpq::network {
     }
 
     std::expected<void, std::string>
-    SocketMPCommunication::flush(const int peerId) {
+    SocketMPChannel::flush(const int peerId) {
         return withPeerSocket(peerId, [&](auto &socket) -> std::expected<void, std::string> {
             if (auto res = socket.streamFlush(); !res) {
                 return std::unexpected(std::format(
@@ -75,7 +75,7 @@ namespace otpq::network {
     }
 
     std::expected<std::size_t, std::string>
-    SocketMPCommunication::broadcastData(const void *data, const std::size_t len) {
+    SocketMPChannel::broadcastData(const void *data, const std::size_t len) {
         std::size_t totalSent = 0;
 
         for (auto &peerSocket: roleServerConnections_ | std::views::values) {
@@ -103,7 +103,7 @@ namespace otpq::network {
 
 
     std::expected<void, std::string>
-    SocketMPCommunication::flushAll() {
+    SocketMPChannel::flushAll() {
         for (auto &peerSocket: roleServerConnections_ | std::views::values) {
             if (auto res = peerSocket.streamFlush(); !res) {
                 return std::unexpected(std::format(
@@ -122,7 +122,7 @@ namespace otpq::network {
     }
 
     std::expected<std::size_t, std::string>
-    SocketMPCommunication::recvData(const int peerId, void *data, std::size_t len) {
+    SocketMPChannel::recvData(const int peerId, void *data, std::size_t len) {
         return withPeerSocket(peerId, [&](auto &socket) -> std::expected<std::size_t, std::string> {
             auto res = socket.recvData(data, len);
             if (!res) {
@@ -135,7 +135,7 @@ namespace otpq::network {
     }
 
     template<typename Func>
-    auto SocketMPCommunication::withPeerSocket(int peerId, Func &&fn)
+    auto SocketMPChannel::withPeerSocket(int peerId, Func &&fn)
         -> decltype(fn(std::declval<sockets::ServerSocketChannel &>())) {
         if (peerId == netcfg_.id()) {
             return std::unexpected("[SocketMPCommunication] cannot target self");

@@ -1,4 +1,4 @@
-#include <otpqcom/NetIO/MPCommunication.h>
+#include <otpqcom/NetIO/MPChannel.h>
 #include <algorithm>
 #include <stdexcept>
 #include <format>
@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 namespace otpq::network {
-    MPCommunication::MPCommunication(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers)
+    MPChannel::MPChannel(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers)
         : netcfg_(std::move(cfg)),
           peers_(peers.begin(), peers.end()) {
         // todo Ensure peers have unique IDs

@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include <otpqcom/NetIO/MPCommunication.h>
+#include <otpqcom/NetIO/MPChannel.h>
 #include <otpqcom/NetIO/ServerSocketChannel.h>
 #include <otpqcom/NetIO/ClientSocketChannel.h>
 #include <otpqcom/NodeNetworkConfig.h>
@@ -12,7 +12,7 @@
 namespace otpq::network {
 
     /**
-     * @class SocketMPCommunication
+     * @class SocketMPChannel
      * @brief A socket-based implementation of multi-peer communication.
      *
      * This class extends the abstract `MPCommunication` interface to provide
@@ -24,7 +24,7 @@ namespace otpq::network {
      * - Manages both server and client socket channels.
      * - Provides message send, broadcast, and receive operations.
      */
-    class SocketMPCommunication final : public MPCommunication {
+    class SocketMPChannel final : public MPChannel {
     public:
         /**
          * @brief Construct a socket-based communication context.
@@ -38,10 +38,10 @@ namespace otpq::network {
          *
          * @throws std::runtime_error if connection setup fails.
          */
-        explicit SocketMPCommunication(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers);
+        explicit SocketMPChannel(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers);
 
         /// @brief Destructor that closes all open socket connections.
-        ~SocketMPCommunication() override;
+        ~SocketMPChannel() override;
 
         /**
          * @brief Send data to a specific peer.

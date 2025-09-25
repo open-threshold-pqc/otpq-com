@@ -10,7 +10,7 @@
 namespace otpq::network {
 
     /**
-     * @class MPCommunication
+     * @class MPChannel
      * @brief Abstract base class for multi-peer communication.
      *
      * Provides a common interface for communication between a node and its peers.
@@ -22,7 +22,7 @@ namespace otpq::network {
      * - Broadcast data to all peers.
      * - Receive data from a specific peer.
      */
-    class MPCommunication {
+    class MPChannel {
     public:
         /**
          * @brief Construct a multi-peer communication context.
@@ -33,10 +33,10 @@ namespace otpq::network {
          * @note The constructor does not establish connections —
          *       it only stores configuration for later use by derived classes.
          */
-        MPCommunication(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers);
+        MPChannel(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers);
 
         /// @brief Virtual destructor for safe polymorphic cleanup.
-        virtual ~MPCommunication() = default;
+        virtual ~MPChannel() = default;
 
         /**
          * @brief Send a block of data to a single peer.
