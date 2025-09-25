@@ -1,8 +1,12 @@
 #pragma once
 
+#include <expected>
+#include <string>
+
 #include <otpqcom/NodeNetworkConfig.h>
 #include <otpqcom/NetIO/SocketChannel.h>
 #include <otpqcom/NetworkConfig.h>
+#include <otpqcom/NetworkMetrics.h>
 
 namespace otpq::network::sockets {
     /**
@@ -33,20 +37,15 @@ namespace otpq::network::sockets {
         /**
          * @brief Connect to a remote node.
          *
-         * Retries until a connection succeeds. Once connected, sets up a
-         * buffered FILE* stream for I/O.
+         * Sets up a buffered FILE* stream for I/O after successful connection.
          *
          * @param cfg Remote node configuration (IP, port).
-         * @throw std::runtime_error if stream setup fails.
+         * @return std::expected<void, std::string> Error message if connection or stream setup fails.
          */
-        void nodeConnect(const NodeNetworkConfig &cfg);
+        std::expected<void, std::string> nodeConnect(const NodeNetworkConfig &cfg);
 
         /**
          * @brief Configure the buffering mode of the I/O stream.
-         *
-         * Allows adjusting how data is buffered when reading/writing
-         * through the underlying `FILE*` stream created after a client
-         * connection is accepted.
          *
          * Supported modes:
          * - NetworkBufferMode::FullyBuffered — buffer entire blocks of data
@@ -54,37 +53,40 @@ namespace otpq::network::sockets {
          * - NetworkBufferMode::Unbuffered    — no buffering (immediate write)
          *
          * @param mode The buffering mode to apply.
-         * @throws std::runtime_error if the stream is not yet initialized or
-         *         if applying the new buffer mode fails.
-         *
-         * @note Must be called after a connection has been accepted, since
-         *       the underlying stream does not exist before that point.
+         * @return std::expected<void, std::string> Error message if stream is uninitialized
+         *         or if applying the buffer mode fails.
          */
-        void setBufferMode(NetworkBufferMode mode) const;
+        std::expected<void, std::string> setBufferMode(NetworkBufferMode mode) const;
 
         /**
          * @brief Send data to the connected node.
          * Retries until all bytes are sent.
+         *
          * @param data Pointer to the data buffer.
          * @param len  Number of bytes to send.
-         * @throw std::runtime_error on failure.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes sent (should equal @p len).
+         *         - On failure: error message.
          */
-        void sendData(const void *data, std::size_t len) override;
+        std::expected<std::size_t, std::string> sendData(const void *data, std::size_t len) override;
 
         /**
          * @brief Receive data from the connected node.
          * Retries until all requested bytes are read.
+         *
          * @param data Pointer to the destination buffer.
          * @param len  Buffer size in bytes.
-         * @throw std::runtime_error on failure.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes received (should equal @p len).
+         *         - On failure: error message.
          */
-        void recvData(void *data, std::size_t len) override;
+        std::expected<std::size_t, std::string> recvData(void *data, std::size_t len) override;
 
         /**
          * @brief Flush the buffered I/O stream.
-         * @throw std::runtime_error if flush fails.
+         * @return std::expected<void, std::string> Error message if flush fails.
          */
-        void streamFlush() const;
+        std::expected<void, std::string> streamFlush() const;
 
     private:
         /**
@@ -100,5 +102,8 @@ namespace otpq::network::sockets {
 
         /// OS-level socket descriptor (-1 if not initialized).
         int connSocket_{-1};
+
+        /// Per-connection network statistics (bytes sent/received).
+        NetworkMetrics netMetrics_;
     };
 } // namespace otpq::network::sockets

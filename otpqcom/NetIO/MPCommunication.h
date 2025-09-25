@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <span>
+#include <expected>
+
 #include <otpqcom/NodeNetworkConfig.h>
 
 namespace otpq::network {
@@ -43,9 +45,12 @@ namespace otpq::network {
          * @param data   Pointer to the raw data buffer.
          * @param len    Size of the data in bytes.
          *
-         * @throws std::runtime_error if sending fails or peer ID is invalid.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes sent.
+         *         - On failure: error message.
          */
-        virtual void sendData(int peerId, const void *data, std::size_t len) = 0;
+        virtual std::expected<std::size_t, std::string>
+        sendData(int peerId, const void *data, std::size_t len) = 0;
 
         /**
          * @brief Broadcast a block of data to all configured peers.
@@ -53,9 +58,12 @@ namespace otpq::network {
          * @param data Pointer to the raw data buffer.
          * @param len  Size of the data in bytes.
          *
-         * @throws std::runtime_error if sending fails for any peer.
+         * @return std::expected<void, std::string>
+         *         - On success: number of bytes totally broadcasted.
+         *         - On failure: error message.
          */
-        virtual void broadcastData(const void *data, std::size_t len) = 0;
+        virtual std::expected<std::size_t, std::string>
+        broadcastData(const void *data, std::size_t len) = 0;
 
         /**
          * @brief Receive a block of data from a specific peer.
@@ -64,9 +72,12 @@ namespace otpq::network {
          * @param data   Pointer to the buffer where received data will be written.
          * @param len    Maximum number of bytes to read into the buffer.
          *
-         * @throws std::runtime_error if receiving fails or peer ID is invalid.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes received.
+         *         - On failure: error message.
          */
-        virtual void recvData(int peerId, void *data, std::size_t len) = 0;
+        virtual std::expected<std::size_t, std::string>
+        recvData(int peerId, void *data, std::size_t len) = 0;
 
     protected:
         NodeNetworkConfig netcfg_;              ///< Local node configuration.

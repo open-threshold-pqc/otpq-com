@@ -24,6 +24,8 @@ add_executable(SocketMPConnectionU2 SocketMPCommunicationUser2_test.cpp)
 target_link_libraries(SocketMPConnectionU2 PRIVATE libotpqcom GTest::gtest_main)
 add_executable(SocketMPConnectionU3 SocketMPCommunicationUser3_test.cpp)
 target_link_libraries(SocketMPConnectionU3 PRIVATE libotpqcom GTest::gtest_main)
+add_executable(SocketMPConnectionU4 SocketMPCommunicationUser4_test.cpp)
+target_link_libraries(SocketMPConnectionU4 PRIVATE libotpqcom GTest::gtest_main)
 
 
 include(GoogleTest)

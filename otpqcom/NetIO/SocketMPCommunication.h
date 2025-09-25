@@ -1,13 +1,16 @@
 #pragma once
 
+#include <expected>
+#include <string>
+#include <unordered_map>
+
 #include <otpqcom/NetIO/MPCommunication.h>
 #include <otpqcom/NetIO/ServerSocketChannel.h>
 #include <otpqcom/NetIO/ClientSocketChannel.h>
 #include <otpqcom/NodeNetworkConfig.h>
 
-#include <unordered_map>
-
 namespace otpq::network {
+
     /**
      * @class SocketMPCommunication
      * @brief A socket-based implementation of multi-peer communication.
@@ -32,6 +35,8 @@ namespace otpq::network {
          * The constructor sets up server/client roles depending on ID ordering:
          * - For peers with IDs smaller than `self.id()`, this node becomes a server.
          * - For peers with IDs greater than `self.id()`, this node becomes a client.
+         *
+         * @throws std::runtime_error if connection setup fails.
          */
         explicit SocketMPCommunication(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers);
 
@@ -45,13 +50,27 @@ namespace otpq::network {
          * @param data   Pointer to the data buffer.
          * @param len    Length of the buffer in bytes.
          *
-         * @throws std::runtime_error if the peer ID is not found or sending fails.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes sent.
+         *         - On failure: error message.
          */
-        void sendData(int peerId, const void *data, std::size_t len) override;
+        std::expected<std::size_t, std::string>
+        sendData(int peerId, const void *data, std::size_t len) override;
 
-        void flush(int peerId);
+        /**
+         * @brief Flush data for a specific peer.
+         *
+         * @param peerId Target peer ID.
+         * @return std::expected<void, std::string> Error message if flush fails.
+         */
+        std::expected<void, std::string> flush(int peerId);
 
-        void flushAll();
+        /**
+         * @brief Flush data for all peers.
+         *
+         * @return std::expected<void, std::string> Error message if flush fails for any peer.
+         */
+        std::expected<void, std::string> flushAll();
 
         /**
          * @brief Broadcast data to all connected peers.
@@ -59,9 +78,10 @@ namespace otpq::network {
          * @param data Pointer to the data buffer.
          * @param len  Length of the buffer in bytes.
          *
-         * @throws std::runtime_error if sending fails to any peer.
+         * @return std::expected<void, std::string> Error message if sending fails to any peer.
          */
-        void broadcastData(const void *data, std::size_t len) override;
+        std::expected<std::size_t, std::string>
+        broadcastData(const void *data, std::size_t len) override;
 
         /**
          * @brief Receive data from a specific peer.
@@ -70,9 +90,12 @@ namespace otpq::network {
          * @param data   Pointer to the buffer where data will be stored.
          * @param len    Maximum number of bytes to read.
          *
-         * @throws std::runtime_error if the peer ID is not found or receiving fails.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes received.
+         *         - On failure: error message.
          */
-        void recvData(int peerId, void *data, std::size_t len) override;
+        std::expected<std::size_t, std::string>
+        recvData(int peerId, void *data, std::size_t len) override;
 
     private:
         /**
@@ -81,15 +104,17 @@ namespace otpq::network {
          * Looks up the peer ID in client and server connection maps and calls
          * the provided function with the socket reference.
          *
-         * @tparam Func Callable type taking `socket&` as parameter.
+         * @tparam Func Callable type returning `std::expected`.
          * @param peerId The peer identifier.
          * @param fn The callable to apply on the socket.
          *
-         * @throw std::invalid_argument if peerId refers to self.
-         * @throw std::runtime_error if the peer is not found.
+         * @return Whatever `fn` returns, typically `std::expected<T, std::string>`.
+         *
+         * @note Returns std::unexpected if peerId is invalid or refers to self.
          */
         template <typename Func>
-        void withPeerSocket(int peerId, Func&& fn);
+        auto withPeerSocket(int peerId, Func&& fn)
+            -> decltype(fn(std::declval<sockets::ServerSocketChannel&>()));
 
         /// @brief Active server-side connections (peers with smaller IDs).
         std::unordered_map<int, sockets::ServerSocketChannel> roleServerConnections_;
@@ -97,4 +122,5 @@ namespace otpq::network {
         /// @brief Active client-side connections (peers with larger IDs).
         std::unordered_map<int, sockets::ClientSocketChannel> roleClientConnections_;
     };
+
 } // namespace otpq::network

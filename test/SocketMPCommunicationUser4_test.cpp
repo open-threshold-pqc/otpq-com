@@ -9,24 +9,25 @@
 using namespace otpq::network;
 
 TEST(SocketMPCommunicationTest, SocketMPCommunication) {
-    const NodeNetworkConfig cfg{3, "127.0.0.1", 13000};
+    const NodeNetworkConfig cfg{4, "127.0.0.1", 14000};
 
     std::array<NodeNetworkConfig, 3> peers {
         NodeNetworkConfig {1, "127.0.0.1", 11000},
         NodeNetworkConfig {2, "127.0.0.1", 12000},
-        NodeNetworkConfig {4, "127.0.0.1", 14000},
+        NodeNetworkConfig {3, "127.0.0.1", 13000},
     };
 
     SocketMPCommunication mpConnection{cfg, peers};
 
     char buff[100]{};
 
-    // recvData now returns std::expected<std::size_t, std::string>
     auto received = mpConnection.recvData(1, buff, 13);
 
     ASSERT_TRUE(received.has_value())
         << "recvData failed: " << received.error();
 
-    buff[*received] = '\0';  // safe termination
+    // Null-terminate string with actual number of bytes received
+    buff[*received] = '\0';
+
     std::cout << "Received from peer 1: " << buff << "\n";
 }

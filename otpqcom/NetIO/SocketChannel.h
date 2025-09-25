@@ -2,6 +2,9 @@
 
 #include <cstring>
 #include <memory>
+#include <expected>
+#include <string>
+
 #include <otpqcom/NodeNetworkConfig.h>
 
 namespace otpq::network::sockets {
@@ -54,19 +57,29 @@ namespace otpq::network::sockets {
 
         /**
          * @brief Send data over the socket.
+         * Retries until all bytes are sent or an error occurs.
+         *
          * @param data Pointer to the bytes to send.
          * @param len  Number of bytes to send.
-         * @throw std::runtime_error on failure.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes sent (should equal @p len).
+         *         - On failure: error message.
          */
-        virtual void sendData(const void *data, std::size_t len) = 0;
+        virtual std::expected<std::size_t, std::string>
+        sendData(const void *data, std::size_t len) = 0;
 
         /**
          * @brief Receive data from the socket.
+         * Retries until all requested bytes are read or an error occurs.
+         *
          * @param data Pointer to the destination buffer.
          * @param len  Buffer size in bytes.
-         * @throw std::runtime_error on failure.
+         * @return std::expected<std::size_t, std::string>
+         *         - On success: number of bytes received (should equal @p len).
+         *         - On failure: error message.
          */
-        virtual void recvData(void *data, std::size_t len) = 0;
+        virtual std::expected<std::size_t, std::string>
+        recvData(void *data, std::size_t len) = 0;
 
     protected:
         /**
@@ -76,6 +89,9 @@ namespace otpq::network::sockets {
          *
          * @throw std::invalid_argument if @p opt is invalid.
          * @throw std::runtime_error if the system call fails.
+         *
+         * @note Still exception-based because it's a low-level helper,
+         *       not part of the high-level error-returning API.
          */
         static void setOption(int connSocket, SocketOptions opt);
 
