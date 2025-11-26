@@ -21,7 +21,7 @@ namespace otpq::network {
     class NodeNetworkConfig final {
     public:
         /// Create a new NodeNetworkConfig.
-        explicit NodeNetworkConfig(std::string_view ip, std::uint16_t basePort);
+        NodeNetworkConfig(std::string_view ip, std::uint16_t basePort = 0);
 
         NodeNetworkConfig() = default;
 

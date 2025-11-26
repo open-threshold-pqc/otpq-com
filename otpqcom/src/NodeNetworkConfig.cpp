@@ -6,7 +6,7 @@
 
 namespace otpq::network {
 
-    NodeNetworkConfig::NodeNetworkConfig(std::string_view ip, std::uint16_t basePort)
+    NodeNetworkConfig::NodeNetworkConfig(const std::string_view ip, const std::uint16_t basePort)
         : ip_(ip),
           basePort_(basePort)
     {

@@ -1,80 +1,101 @@
 #include <gtest/gtest.h>
 #include <string>
 #include <array>
+#include <vector>
 #include <thread>
 #include <chrono>
 #include <iostream>
+#include <random>
 
 #include <otpqcom/NetIO/SocketMPChannel.h>
 #include <otpqcom/NodeNetworkConfig.h>
 
 using namespace otpq::network;
 
-namespace {
 
-// Helper to run a node in its own thread
-void runNode(NodeNetworkConfig self, std::array<NodeNetworkConfig, 4> allPeers) {
-    // Filter peers (exclude self)
-    std::vector<NodeNetworkConfig> peers;
-    for (const auto& p : allPeers) {
-        if (p.id() != self.id()) {
-            peers.push_back(p);
-        }
-    }
+constexpr int CLIENT_MESSAGE_SIZE = 50;
+constexpr int REPLY_MESSAGE_SIZE = 50;
 
-    SocketMPChannel comm{self, peers};
-
-    // Simple logic: node 1 broadcasts, others receive
-    if (self.id() == 1) {
-        const std::string msg = "Hello World 1";
-
-        auto res = comm.broadcastData(msg.data(), msg.size());
-        if (!res) {
-            std::cerr << "[Node 1] Broadcast failed: " << res.error() << "\n";
-            return;
-        }
-        std::cout << "[Node 1] Broadcasted " << *res << " bytes\n";
-
-        auto flushed = comm.flushAll();
-        if (!flushed) {
-            std::cerr << "[Node 1] Flush failed: " << flushed.error() << "\n";
-            return;
-        }
-    } else {
-        char buff[64]{};
-        auto received = comm.recvData(1, buff, 13);
-        if (!received) {
-            std::cerr << "[Node " << self.id() << "] Receive failed: " << received.error() << "\n";
-            return;
-        }
-        buff[*received] = '\0';
-        std::cout << "[Node " << self.id() << "] Got message: " << buff << "\n";
-    }
+std::string randomMessage() {
+    static thread_local std::mt19937 rng{std::random_device{}()};
+    static std::uniform_int_distribution<int> dist('A', 'Z');
+    std::string s;
+    s.reserve(CLIENT_MESSAGE_SIZE);
+    for (int i = 0; i < CLIENT_MESSAGE_SIZE; ++i)
+        s.push_back(static_cast<char>(dist(rng)));
+    return s;
 }
 
+namespace {
+    // Helper to run a node in its own thread
+    void runNode(
+        int selfId,
+        NodeNetworkConfig selfCfg,
+        std::span<std::pair<int, NodeNetworkConfig> > peers) {
+        // Construct communication channel
+        SocketMPChannel comm{selfId, selfCfg, peers};
+
+
+        // Node 1 broadcasts
+        if (selfId == 1) {
+            auto randomMsg = randomMessage();
+
+            auto res = comm.broadcastData(randomMsg.data(), randomMsg.size());
+
+            if (!res) {
+                std::cerr << "[Node 1] Broadcast failed: " << res.error() << "\n";
+                return;
+            }
+
+            if (auto flushed = comm.flushAll(); !flushed) {
+                std::cerr << "[Node 1] Flush failed: " << flushed.error() << "\n";
+                return;
+            }
+
+            std::cout << "[Node 1] Broadcasted " << *res << " bytes (in total to all others in the group)\n";
+            return;
+        }
+
+        // Other nodes receive from node 1
+        char buff[REPLY_MESSAGE_SIZE]{};
+        auto received = comm.recvData(1, buff, REPLY_MESSAGE_SIZE);
+
+        if (!received) {
+            std::cerr << "[Node " << selfId << "] Receive failed: "
+                    << received.error() << "\n";
+            return;
+        }
+
+        buff[*received] = '\0';
+        std::cout << "[Node " << selfId << "] Got: " << buff << "\n";
+    }
 } // namespace
 
+
 TEST(SocketMPCommunicationTest, MultiThreadedInProcess) {
-    // All nodes (ids 1–4)
-    std::array<NodeNetworkConfig, 4> nodes {
-        NodeNetworkConfig{1, "127.0.0.1", 11000},
-        NodeNetworkConfig{2, "127.0.0.1", 12000},
-        NodeNetworkConfig{3, "127.0.0.1", 13000},
-        NodeNetworkConfig{4, "127.0.0.1", 14000},
+    using Peer = std::pair<int, NodeNetworkConfig>;
+
+    std::array<Peer, 4> nodes{
+        {
+            {1, {"127.0.0.1", 11000}},
+            {2, {"127.0.0.1", 12000}},
+            {3, {"127.0.0.1", 13000}},
+            {4, {"127.0.0.1", 14000}},
+        }
     };
 
-    // Start each node in its own thread
     std::vector<std::thread> threads;
-    for (auto& n : nodes) {
-        threads.emplace_back([&nodes, n]() {
-            runNode(n, nodes);
+    threads.reserve(nodes.size());
+
+    for (auto &[peerId, peerCfg]: nodes) {
+        threads.emplace_back([peerId, peerCfg, &nodes]() {
+            // Directly pass ALL peers. No filtering here.
+            runNode(peerId, peerCfg, nodes);
         });
     }
 
-    // Let all threads finish
-    for (auto& t : threads) {
+    for (auto &t: threads)
         t.join();
-    }
 
-    SUCCEED(); // If no crashes/errors, test passes
+    SUCCEED();
 }

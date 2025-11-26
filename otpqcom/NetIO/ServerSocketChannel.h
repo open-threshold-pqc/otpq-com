@@ -109,7 +109,7 @@ namespace otpq::network::sockets {
 
         int listenSocket_{-1}; ///< Passive socket (listening).
         int connSocket_{-1}; ///< Active connection socket (after accept).
-        FILE *stream_{nullptr}; ///< Buffered I/O wrapping connSocket_.
+        FILE *stream_{}; ///< Buffered I/O wrapping connSocket_.
 
         NetworkMetrics netMetrics_{}; ///< Per-connection metrics.
     };

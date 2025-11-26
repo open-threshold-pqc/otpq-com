@@ -28,12 +28,11 @@ namespace otpq::network {
          * @brief Construct a multi-peer communication context.
          *
          * @param cfg   The network configuration of this node (self).
-         * @param peers The set of peer network configurations.
          *
          * @note The constructor does not establish connections —
          *       it only stores configuration for later use by derived classes.
          */
-        MPChannel(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers);
+        MPChannel(NodeNetworkConfig cfg);
 
         /// @brief Virtual destructor for safe polymorphic cleanup.
         virtual ~MPChannel() = default;
@@ -81,7 +80,6 @@ namespace otpq::network {
 
     protected:
         NodeNetworkConfig netcfg_;              ///< Local node configuration.
-        std::vector<NodeNetworkConfig> peers_;  ///< List of peer configurations.
     };
 
 } // namespace otpq::network

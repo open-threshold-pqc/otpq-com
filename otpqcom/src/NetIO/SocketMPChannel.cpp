@@ -6,46 +6,72 @@
 #include <otpqcom/NetIO/SocketMPChannel.h>
 
 namespace otpq::network {
-    SocketMPChannel::SocketMPChannel(NodeNetworkConfig self,
-                                                 std::span<NodeNetworkConfig> peers)
-        : MPChannel(std::move(self), peers) {
-        /* Server role: handle peers with smaller IDs */
-        for (const auto &peer: peers_) {
-            if (peer.id() < netcfg_.id()) {
-                NodeNetworkConfig listenCfg{netcfg_.id(), netcfg_.ip(), netcfg_.base_port() + peer.id()};
-                auto &serverSocket = roleServerConnections_.try_emplace(peer.id(), listenCfg).first->second;
+    SocketMPChannel::SocketMPChannel(
+            int selfId,
+            NodeNetworkConfig selfCfg,
+            std::span<std::pair<int, NodeNetworkConfig>> peers)
+        : MPChannel(std::move(selfCfg)),
+          selfId_{selfId}
+    {
+        /* --- Server role: peers with smaller IDs --- */
+        for (auto &peerId: peers | std::views::keys) {
+
+            if (peerId == selfId_) continue;
+
+            if (peerId < selfId_) {
+
+                NodeNetworkConfig listenCfg{
+                    netcfg_.ip(),
+                    static_cast<std::uint16_t>(netcfg_.basePort() + peerId)
+                };
+
+                auto& serverSocket =
+                    roleServerConnections_.try_emplace(peerId, listenCfg).first->second;
 
                 if (auto res = serverSocket.awaitConnection(); !res) {
                     throw std::runtime_error(std::format(
-                        "[SocketMPCommunication] server awaitConnection for peer {} failed: {}",
-                        peer.id(), res.error()));
+                        "server awaitConnection for peer {} failed: {}",
+                        peerId, res.error()));
                 }
             }
         }
 
-        /* Client role: handle peers with larger IDs */
-        for (const auto &peer: peers_) {
-            if (peer.id() > netcfg_.id()) {
-                NodeNetworkConfig connectCfg{peer.id(), peer.ip(), peer.base_port() + netcfg_.id()};
-                auto &clientSocket = roleClientConnections_.try_emplace(peer.id(), netcfg_).first->second;
+        /* --- Client role: peers with larger IDs --- */
+        for (auto& [peerId, peerCfg] : peers) {
+
+            if (peerId == selfId_) continue;
+
+            if (peerId > selfId_) {
+
+                NodeNetworkConfig connectCfg{
+                    peerCfg.ip(),
+                    static_cast<std::uint16_t>(peerCfg.basePort() + selfId_)
+                };
+
+
+                auto& clientSocket =
+                    roleClientConnections_.try_emplace(peerId, netcfg_).first->second;
 
                 if (auto res = clientSocket.nodeConnect(connectCfg); !res) {
                     throw std::runtime_error(std::format(
-                        "[SocketMPCommunication] client nodeConnect to peer {} failed: {}",
-                        peer.id(), res.error()));
+                        "client nodeConnect to peer {} failed: {}",
+                        peerId, res.error()));
                 }
+
             }
         }
 
-        /* Accept all pending connections from server role */
-        for (auto &peerSocket: roleServerConnections_ | std::views::values) {
+        /* --- Accept pending server connections --- */
+        for (auto& peerSocket : roleServerConnections_ | std::views::values) {
+
             if (auto res = peerSocket.acceptConnection(); !res) {
                 throw std::runtime_error(std::format(
-                    "[SocketMPCommunication] server acceptConnection failed: {}",
-                    res.error()));
+                    "server acceptConnection failed: {}", res.error()));
             }
         }
     }
+
+
 
     SocketMPChannel::~SocketMPChannel() = default;
 
@@ -133,23 +159,4 @@ namespace otpq::network {
             return res.value();
         });
     }
-
-    template<typename Func>
-    auto SocketMPChannel::withPeerSocket(int peerId, Func &&fn)
-        -> decltype(fn(std::declval<sockets::ServerSocketChannel &>())) {
-        if (peerId == netcfg_.id()) {
-            return std::unexpected("[SocketMPCommunication] cannot target self");
-        }
-
-        if (auto it = roleClientConnections_.find(peerId); it != roleClientConnections_.end()) {
-            return fn(it->second);
-        }
-
-        if (auto it = roleServerConnections_.find(peerId); it != roleServerConnections_.end()) {
-            return fn(it->second);
-        }
-
-        return std::unexpected(std::format(
-            "[SocketMPCommunication] peerId {} not found in connections", peerId));
-    }
-} // namespace otpq::network
+}

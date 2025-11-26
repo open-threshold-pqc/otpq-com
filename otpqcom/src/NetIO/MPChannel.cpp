@@ -6,9 +6,8 @@
 #include <unordered_set>
 
 namespace otpq::network {
-    MPChannel::MPChannel(NodeNetworkConfig cfg, std::span<NodeNetworkConfig> peers)
-        : netcfg_(std::move(cfg)),
-          peers_(peers.begin(), peers.end()) {
+    MPChannel::MPChannel(NodeNetworkConfig cfg)
+        : netcfg_(std::move(cfg)) {
         // todo Ensure peers have unique IDs
         // std::unordered_set<int> seenIds;
         // for (const auto& peer : peers_) {

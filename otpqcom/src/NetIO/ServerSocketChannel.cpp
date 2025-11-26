@@ -193,12 +193,6 @@ namespace otpq::network::sockets {
         sockaddr_in serv{};
         serv.sin_family = AF_INET;
 
-        if (::inet_pton(AF_INET, netcfg_.ip().data(), &serv.sin_addr) <= 0) {
-            throw std::runtime_error(std::format(
-                "[ServerSocketChannel] invalid IP ({})", netcfg_.ip()
-            ));
-        }
-
         serv.sin_port = ::htons(netcfg_.basePort());
 
         listenSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);

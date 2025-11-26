@@ -10,7 +10,6 @@
 #include <otpqcom/NodeNetworkConfig.h>
 
 namespace otpq::network {
-
     /**
      * @class SocketMPChannel
      * @brief A socket-based implementation of multi-peer communication.
@@ -29,6 +28,7 @@ namespace otpq::network {
         /**
          * @brief Construct a socket-based communication context.
          *
+         * @param selfId Id of the current Socket communicator
          * @param self  The local node’s configuration.
          * @param peers The list of peer configurations.
          *
@@ -38,7 +38,7 @@ namespace otpq::network {
          *
          * @throws std::runtime_error if connection setup fails.
          */
-        explicit SocketMPChannel(NodeNetworkConfig self, std::span<NodeNetworkConfig> peers);
+        explicit SocketMPChannel(int selfId, NodeNetworkConfig self, std::span<std::pair<int, NodeNetworkConfig>> peers);
 
         /// @brief Destructor that closes all open socket connections.
         ~SocketMPChannel() override;
@@ -98,6 +98,9 @@ namespace otpq::network {
         recvData(int peerId, void *data, std::size_t len) override;
 
     private:
+        /// @brief ID of this node (copied from self.id() at construction).
+        int selfId_{};
+
         /**
          * @brief Apply a function to the socket associated with a peer ID.
          *
@@ -112,9 +115,26 @@ namespace otpq::network {
          *
          * @note Returns std::unexpected if peerId is invalid or refers to self.
          */
-        template <typename Func>
-        auto withPeerSocket(int peerId, Func&& fn)
-            -> decltype(fn(std::declval<sockets::ServerSocketChannel&>()));
+        template<typename Func>
+        auto withPeerSocket(int peerId, Func &&fn)
+            -> decltype(fn(std::declval<sockets::ServerSocketChannel &>())) {
+            if (peerId == selfId_) {
+                return std::unexpected("[SocketMPCommunication] cannot target self");
+            }
+
+            if (auto it = roleClientConnections_.find(peerId);
+                it != roleClientConnections_.end()) {
+                return fn(it->second);
+            }
+
+            if (auto it = roleServerConnections_.find(peerId);
+                it != roleServerConnections_.end()) {
+                return fn(it->second);
+            }
+
+            return std::unexpected(std::format(
+                "[SocketMPCommunication] peerId {} not found in connections", peerId));
+        }
 
         /// @brief Active server-side connections (peers with smaller IDs).
         std::unordered_map<int, sockets::ServerSocketChannel> roleServerConnections_;
@@ -122,5 +142,4 @@ namespace otpq::network {
         /// @brief Active client-side connections (peers with larger IDs).
         std::unordered_map<int, sockets::ClientSocketChannel> roleClientConnections_;
     };
-
 } // namespace otpq::network

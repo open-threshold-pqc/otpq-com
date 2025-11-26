@@ -26,7 +26,7 @@ std::string randomMessage() {
 }
 
 void runServer() {
-    const NodeNetworkConfig cfg{"127.0.0.1", 0};
+    const NodeNetworkConfig cfg{"127.0.0.1", 9000};
     sockets::ServerSocketChannel server{cfg};
 
     std::cout << "[SERVER] Listening on " << cfg.ip() << ":" << cfg.basePort() << '\n';
@@ -60,12 +60,9 @@ void runServer() {
 }
 
 void runClient() {
-    const NodeNetworkConfig localCfg{"127.0.0.1", 10000};
-    const NodeNetworkConfig remoteCfg{"127.0.0.1", 9000};
+    sockets::ClientSocketChannel client{{"127.0.0.1"}};
 
-    sockets::ClientSocketChannel client{localCfg};
-
-    if (auto c0 = client.nodeConnect(remoteCfg); !c0) {
+    if (auto c0 = client.nodeConnect({"127.0.0.1", 9000}); !c0) {
         std::cerr << c0.error() << '\n';
         return;
     }
