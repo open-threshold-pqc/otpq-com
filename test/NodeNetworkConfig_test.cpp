@@ -8,14 +8,14 @@ namespace {
         const NodeNetworkConfig cfg{"127.0.0.1", 9000};
 
         EXPECT_EQ(cfg.ip(), "127.0.0.1");
-        EXPECT_EQ(cfg.base_port(), std::uint16_t{9000});
+        EXPECT_EQ(cfg.basePort(), std::uint16_t{9000});
     }
 
     TEST(NodeNetworkConfig, ValidZeroPort) {
         const NodeNetworkConfig cfg{"127.0.0.1", 0};
 
         EXPECT_EQ(cfg.ip(), "127.0.0.1");
-        EXPECT_EQ(cfg.base_port(), std::uint16_t{0});
+        EXPECT_EQ(cfg.basePort(), std::uint16_t{0});
     }
 
     TEST(NodeNetworkConfig, InvalidIpThrows) {

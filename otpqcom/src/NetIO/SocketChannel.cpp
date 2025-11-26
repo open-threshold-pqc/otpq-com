@@ -1,5 +1,7 @@
 #include <stdexcept>
-#include <iostream>
+#include <format>
+#include <algorithm>
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -9,44 +11,40 @@
 
 namespace otpq::network::sockets {
     SocketChannel::SocketChannel(NodeNetworkConfig cfg)
-        : netcfg_(std::move(cfg)),
-          buffer_(std::make_unique<uint8_t[]>(NETWORK_IO_BUFFER_SIZE)) {
-        std::fill_n(buffer_.get(), NETWORK_IO_BUFFER_SIZE, 0);
+        : netcfg_{std::move(cfg)},
+          buffer_{std::make_unique<std::uint8_t[]>(NETWORK_IO_BUFFER_SIZE)} {
+        std::ranges::fill_n(buffer_.get(), NETWORK_IO_BUFFER_SIZE, std::uint8_t{0});
     }
 
     SocketChannel::~SocketChannel() = default;
 
-    void SocketChannel::setOption(const int connSocket, const SocketOptions opt) {
+    std::expected<void, std::string>
+    SocketChannel::setOption(const int connSocket, const SocketOptions opt) noexcept {
         if (connSocket < 0)
-            throw std::runtime_error("[SocketChannel] setOption(): invalid socket descriptor (< 0)");
+            return std::unexpected{"invalid socket descriptor (< 0)"};
 
+        constexpr int enable = 1;
+        constexpr int disable = 0;
 
-        constexpr int enable{1};
-        constexpr int disable{0};
+        auto apply = [&](int level, int name, const int *val, const char *desc)
+            -> std::expected<void, std::string> {
+            if (::setsockopt(connSocket, level, name, val, sizeof(*val)) < 0)
+                return std::unexpected{std::format("failed to set {}", desc)};
+            return {};
+        };
+
         switch (opt) {
             case SocketOptions::REUSEADDR:
-                if (::setsockopt(connSocket, SOL_SOCKET, SO_REUSEADDR,
-                                 &enable, sizeof(enable)) < 0) {
-                    throw std::runtime_error("[SocketChannel] setOption(): failed to set SO_REUSEADDR");
-                }
-                break;
+                return apply(SOL_SOCKET, SO_REUSEADDR, &enable, "SO_REUSEADDR");
 
             case SocketOptions::SETDELAY:
-                if (::setsockopt(connSocket, IPPROTO_TCP, TCP_NODELAY,
-                                 &disable, sizeof(disable)) < 0) {
-                    throw std::runtime_error("[SocketChannel] setOption(): failed to set TCP_NODELAY=0");
-                }
-                break;
+                return apply(IPPROTO_TCP, TCP_NODELAY, &disable, "TCP_NODELAY=0");
 
             case SocketOptions::SETNODELAY:
-                if (::setsockopt(connSocket, IPPROTO_TCP, TCP_NODELAY,
-                                 &enable, sizeof(enable)) < 0) {
-                    throw std::runtime_error("[SocketChannel] setOption(): failed to set TCP_NODELAY=1");
-                }
-                break;
+                return apply(IPPROTO_TCP, TCP_NODELAY, &enable, "TCP_NODELAY=1");
 
             default:
-                throw std::invalid_argument("[SocketChannel] setOption(): unsupported socket option");
+                return std::unexpected{"unsupported socket option"};
         }
     }
-} // namespace otpq::network::sockets
+}

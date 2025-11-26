@@ -2,6 +2,7 @@
 
 #include <expected>
 #include <string>
+#include <cstdio>
 
 #include <otpqcom/NodeNetworkConfig.h>
 #include <otpqcom/NetIO/SocketChannel.h>
@@ -9,117 +10,107 @@
 #include <otpqcom/NetworkMetrics.h>
 
 namespace otpq::network::sockets {
-
     /**
      * @class ServerSocketChannel
-     * @brief Server-side socket channel implementation.
+     * @brief TCP server-side socket wrapper.
      *
-     * Provides socket communication for servers, including send/receive operations
-     * and the ability to receive a remote connection.
+     * Responsibilities:
+     *   - Create/bind/listen on a server socket
+     *   - Accept one incoming connection
+     *   - Provide send/recv using expected-based error reporting
+     *   - Manage buffering and connection metrics
      *
-     * Instances are move-only and enforce unique ownership of the underlying socket.
+     * Move-only, non-copyable. A single instance represents a single server,
+     * and (after accept) one active client connection.
      */
     class ServerSocketChannel final : public SocketChannel {
     public:
         /**
-         * @brief Construct a server socket channel with the given configuration.
-         *        The constructor allocates and prepares the listening socket.
-         * @param cfg Local network configuration (IP, port, etc.).
-         * @throw std::runtime_error if socket setup fails.
+         * @brief Construct a server channel with the given configuration.
+         *
+         * Prepares the listening socket (bind, configure).
+         * Does not block or accept until awaitConnection()/acceptConnection().
+         *
+         * @throws std::runtime_error if setupServer() fails
          */
         explicit ServerSocketChannel(NodeNetworkConfig cfg);
 
-        /**
-         * @brief Destructor.
-         *
-         * Closes any active connection, the listening socket, and the I/O stream.
-         */
+        /// Destructor closes connection socket, listen socket, and FILE* stream.
         ~ServerSocketChannel() override;
 
-        /**
-         * @brief Send data to the connected node.
-         * Retries until all bytes are sent.
-         * @param data Pointer to the data buffer.
-         * @param len  Number of bytes to send.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes sent (should equal @p len).
-         *         - On failure: error message.
-         */
+        // ---------------------------------------------------------------------
+        //  I/O Operations (expected-based)
+        // ---------------------------------------------------------------------
+
+        [[nodiscard]]
         std::expected<std::size_t, std::string>
-        sendData(const void *data, std::size_t len) override;
+        sendData(const void *data, std::size_t len) noexcept override;
 
-        /**
-         * @brief Receive data from the connected client.
-         * Retries until all requested bytes are read.
-         * @param data Pointer to the destination buffer.
-         * @param len  Buffer size in bytes.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes received (should equal @p len).
-         *         - On failure: error message.
-         */
+        [[nodiscard]]
         std::expected<std::size_t, std::string>
-        recvData(void *data, std::size_t len) override;
+        recvData(void *data, std::size_t len) noexcept override;
 
         /**
-         * @brief Flush the buffered I/O stream.
-         * @return std::expected<void, std::string> Error message if flush fails.
+         * @brief Flush buffered output to the client.
          */
-        std::expected<void, std::string> streamFlush() const;
+        [[nodiscard]]
+        std::expected<void, std::string> streamFlush() const noexcept;
+
+        // ---------------------------------------------------------------------
+        //  Server Lifecycle
+        // ---------------------------------------------------------------------
 
         /**
-         * @brief Put the server into listening mode.
-         * Must be called before accepting connections.
-         * @return std::expected<void, std::string> Error message if listen() fails.
-         */
-        std::expected<void, std::string> awaitConnection() const;
-
-        /**
-         * @brief Accept the next incoming connection.
-         * Creates a dedicated client socket for communication.
-         * @return std::expected<void, std::string> Error message if accept() fails.
-         */
-        std::expected<void, std::string> acceptConnection();
-
-        /**
-         * @brief Run the server loop: listen and accept connections.
-         * Once connected, sendData() and recvData() can be used.
-         * @return std::expected<void, std::string> Error message if listen() or accept() fails.
-         */
-        std::expected<void, std::string> awaitAndServe();
-
-        /**
-         * @brief Configure the buffering mode of the I/O stream.
+         * @brief Start listening.
          *
-         * Supported modes:
-         * - NetworkBufferMode::FullyBuffered — buffer entire blocks of data
-         * - NetworkBufferMode::LineBuffered  — flush on newline
-         * - NetworkBufferMode::Unbuffered    — no buffering (immediate write)
-         *
-         * @param mode The buffering mode to apply.
-         * @return std::expected<void, std::string> Error message if the stream is not yet initialized
-         *         or if applying the new buffer mode fails.
+         * Must be called before acceptConnection().
          */
-        std::expected<void, std::string> setBufferMode(NetworkBufferMode mode) const;
+        [[nodiscard]]
+        std::expected<void, std::string> awaitConnection() const noexcept;
+
+        /**
+         * @brief Accept one client.
+         *
+         * On success, initializes connSocket_ and stream_.
+         */
+        [[nodiscard]]
+        std::expected<void, std::string> acceptConnection() noexcept;
+
+        /**
+         * @brief Convenience API: listen + accept.
+         */
+        [[nodiscard]]
+        std::expected<void, std::string> awaitAndServe() noexcept;
+
+        // ---------------------------------------------------------------------
+        //  Buffering
+        // ---------------------------------------------------------------------
+
+        /**
+         * @brief Configure the buffering mode for stream_.
+         *
+         * Error if stream_ not yet created (before acceptConnection()).
+         */
+        [[nodiscard]]
+        std::expected<void, std::string>
+        setBufferMode(NetworkBufferMode mode) const noexcept;
 
     private:
         /**
-         * @brief Initialize the server socket.
-         * Creates, binds, and configures the listening socket.
-         * @throw std::runtime_error if setup fails.
+         * @brief Create, bind, and configure the listening socket.
+         *
+         * @throws std::runtime_error on failure (low-level system errors)
          */
         void setupServer();
 
-        /// Listening socket descriptor (-1 if not initialized).
-        int listenSocket_{-1};
+        // ---------------------------------------------------------------------
+        //  Internal State
+        // ---------------------------------------------------------------------
 
-        /// Buffered I/O stream (created after client acceptance).
-        FILE* stream_{nullptr};
+        int listenSocket_{-1}; ///< Passive socket (listening).
+        int connSocket_{-1}; ///< Active connection socket (after accept).
+        FILE *stream_{nullptr}; ///< Buffered I/O wrapping connSocket_.
 
-        /// Connected node socket descriptor (-1 if not connected).
-        int connSocket_{-1};
-
-        /// Per-connection network statistics (bytes sent/received).
-        NetworkMetrics netMetrics_;
+        NetworkMetrics netMetrics_{}; ///< Per-connection metrics.
     };
-
-} // namespace otpq::network::sockets
+}

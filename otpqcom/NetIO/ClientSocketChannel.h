@@ -2,6 +2,7 @@
 
 #include <expected>
 #include <string>
+#include <cstdio>
 
 #include <otpqcom/NodeNetworkConfig.h>
 #include <otpqcom/NetIO/SocketChannel.h>
@@ -11,99 +12,79 @@
 namespace otpq::network::sockets {
     /**
      * @class ClientSocketChannel
-     * @brief Client-side implementation of SocketChannel.
+     * @brief TCP client-side implementation of SocketChannel.
      *
-     * Provides socket communication for clients, including send/receive operations
-     * and the ability to connect to a remote node. Instances are non-copyable
-     * but movable, enforcing unique ownership of the underlying socket.
+     * A move-only channel that owns one active connection.
+     * It offers:
+     *  - connect() with expected-based error reporting
+     *  - buffered send/recv operations
+     *  - socket and FILE* lifetime management
      */
     class ClientSocketChannel final : public SocketChannel {
     public:
         /**
          * @brief Construct a client socket channel with the given configuration.
-         *        The constructor allocates the socket and binds to the given network configuration.
-         * @param cfg Local network configuration (IP, port, etc.).
-         * @throw std::runtime_error if socket creation or bind fails.
+         *
+         * The constructor allocates a socket and binds to the local address.
+         * Connection to a remote host occurs via nodeConnect().
+         *
+         * @throws std::runtime_error if socket creation or bind fails.
          */
         explicit ClientSocketChannel(NodeNetworkConfig cfg);
 
-        /**
-         * @brief Destructor.
-         *
-         * Flushes and closes the stream (if open) and closes the socket descriptor.
-         */
+        /// Destructor flushes and closes the stream and socket.
         ~ClientSocketChannel() override;
+
 
         /**
          * @brief Connect to a remote node.
          *
-         * Sets up a buffered FILE* stream for I/O after successful connection.
+         * On success, creates a buffered FILE* I/O stream wrapping the socket.
          *
-         * @param cfg Remote node configuration (IP, port).
-         * @return std::expected<void, std::string> Error message if connection or stream setup fails.
+         * @param cfg Remote endpoint configuration.
+         * @return
+         *   - {} on success
+         *   - unexpected(error string) on failure
          */
-        std::expected<void, std::string> nodeConnect(const NodeNetworkConfig &cfg);
+        [[nodiscard]]
+        std::expected<void, std::string>
+        nodeConnect(const NodeNetworkConfig &cfg) noexcept;
+
 
         /**
-         * @brief Configure the buffering mode of the I/O stream.
+         * @brief Configure buffering mode for the FILE* stream.
          *
-         * Supported modes:
-         * - NetworkBufferMode::FullyBuffered — buffer entire blocks of data
-         * - NetworkBufferMode::LineBuffered  — flush on newline
-         * - NetworkBufferMode::Unbuffered    — no buffering (immediate write)
-         *
-         * @param mode The buffering mode to apply.
-         * @return std::expected<void, std::string> Error message if stream is uninitialized
-         *         or if applying the buffer mode fails.
+         * Requires an established connection (stream_ must be non-null).
          */
-        std::expected<void, std::string> setBufferMode(NetworkBufferMode mode) const;
+        [[nodiscard]]
+        std::expected<void, std::string>
+        setBufferMode(NetworkBufferMode mode) const noexcept;
 
-        /**
-         * @brief Send data to the connected node.
-         * Retries until all bytes are sent.
-         *
-         * @param data Pointer to the data buffer.
-         * @param len  Number of bytes to send.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes sent (should equal @p len).
-         *         - On failure: error message.
-         */
-        std::expected<std::size_t, std::string> sendData(const void *data, std::size_t len) override;
+        [[nodiscard]]
+        std::expected<std::size_t, std::string>
+        sendData(const void *data, std::size_t len) noexcept override;
 
-        /**
-         * @brief Receive data from the connected node.
-         * Retries until all requested bytes are read.
-         *
-         * @param data Pointer to the destination buffer.
-         * @param len  Buffer size in bytes.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes received (should equal @p len).
-         *         - On failure: error message.
-         */
-        std::expected<std::size_t, std::string> recvData(void *data, std::size_t len) override;
+        [[nodiscard]]
+        std::expected<std::size_t, std::string>
+        recvData(void *data, std::size_t len) noexcept override;
 
-        /**
-         * @brief Flush the buffered I/O stream.
-         * @return std::expected<void, std::string> Error message if flush fails.
-         */
-        std::expected<void, std::string> streamFlush() const;
+        [[nodiscard]]
+        std::expected<void, std::string>
+        streamFlush() const noexcept;
 
     private:
         /**
-         * @brief Initialize the client socket.
+         * @brief Initialize local client socket.
          *
-         * Creates a TCP socket, applies socket options, and binds to the local address.
-         * @throw std::runtime_error if socket creation or bind fails.
+         * Creates a TCP socket, applies default socket options,
+         * and binds to the local ip/port defined by netcfg_.
+         *
+         * @throws std::runtime_error On creation or bind failure.
          */
         void setupClient();
 
-        /// Buffered I/O stream (created after connection).
-        FILE *stream_{nullptr};
-
-        /// OS-level socket descriptor (-1 if not initialized).
-        int connSocket_{-1};
-
-        /// Per-connection network statistics (bytes sent/received).
-        NetworkMetrics netMetrics_;
+        FILE *stream_{nullptr}; ///< Buffered I/O after successful connect().
+        int connSocket_{-1}; ///< Active connection file descriptor.
+        NetworkMetrics netMetrics_; ///< Per-connection read/write stats.
     };
 } // namespace otpq::network::sockets

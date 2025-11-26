@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -40,7 +41,7 @@ namespace otpq::network {
         }
 
         /// @return The node's base port.
-        [[nodiscard]] constexpr std::uint16_t base_port() const noexcept {
+        [[nodiscard]] constexpr std::uint16_t basePort() const noexcept {
             return basePort_;
         }
 

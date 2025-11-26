@@ -1,105 +1,107 @@
 #pragma once
 
-#include <cstring>
+#include <cstdint>
 #include <memory>
-#include <expected>
 #include <string>
+#include <expected>
 
 #include <otpqcom/NodeNetworkConfig.h>
 
 namespace otpq::network::sockets {
-
     /**
      * @enum SocketOptions
-     * @brief Configurable options for a socket.
-     *
-     * Use with SocketChannel::setOption() to control OS-level behavior.
+     * @brief OS-level socket behavior switches.
      */
     enum class SocketOptions {
-        REUSEADDR, ///< Allow reuse of local addresses (SO_REUSEADDR).
-        SETDELAY,  ///< Enable delayed sends (Nagle’s algorithm enabled).
-        SETNODELAY ///< Disable delayed sends (Nagle’s algorithm disabled).
+        REUSEADDR, ///< Enables SO_REUSEADDR.
+        SETDELAY, ///< Enables Nagle's algorithm.
+        SETNODELAY ///< Disables Nagle's algorithm.
     };
 
     /**
      * @class SocketChannel
-     * @brief Abstract base class for all socket communication channels.
+     * @brief Abstract base class for socket communication channels.
      *
-     * Provides the common interface for sending/receiving data and configuring sockets.
-     * Classes derived from SocketChannel (e.g., ServerSocketChannel, ClientSocketChannel)
-     * implement the transport-specific logic. Each socket will be handling one connection at a time.
+     * Provides:
+     *   - A move-only, RAII-safe socket ownership framework
+     *   - A common send/recv interface for TCP communication
+     *   - Utility for setting OS socket options
      *
-     * @note This type is move-only: copy operations are disabled, but move is supported.
-     *       This enforces unique ownership of the underlying OS socket.
+     * Derived classes (e.g., ServerSocketChannel, ClientSocketChannel)
+     * must implement transport-specific logic.
+     *
+     * This class represents **one connection per object**.
      */
     class SocketChannel {
     public:
-        /**
-         * @brief Construct a socket channel with the given configuration.
-         * @param cfg Network configuration (e.g., IP address and port).
-         */
+        /// Construct a socket channel tied to a network configuration.
         explicit SocketChannel(NodeNetworkConfig cfg);
 
-        /// Deleted copy operations (enforces unique ownership).
-        SocketChannel(const SocketChannel&) = delete;
-        SocketChannel& operator=(const SocketChannel&) = delete;
+        /// Deleted copy (sockets cannot be shared).
+        SocketChannel(const SocketChannel &) = delete;
 
-        /// Defaulted move operations (transfer ownership).
-        SocketChannel(SocketChannel&&) noexcept = default;
-        SocketChannel& operator=(SocketChannel&&) noexcept = default;
+        SocketChannel &operator=(const SocketChannel &) = delete;
 
-        /**
-         * @brief Virtual destructor.
-         *
-         * Ensures proper cleanup of resources (e.g., closing sockets).
-         */
+        /// Move-enabled (ownership transfer).
+        SocketChannel(SocketChannel &&) noexcept = default;
+
+        SocketChannel &operator=(SocketChannel &&) noexcept = default;
+
+        /// Virtual destructor ensures correct cleanup by derived classes.
         virtual ~SocketChannel();
 
         /**
-         * @brief Send data over the socket.
-         * Retries until all bytes are sent or an error occurs.
+         * @brief Send bytes over the socket reliably.
          *
-         * @param data Pointer to the bytes to send.
+         * @param data Pointer to the buffer to send.
          * @param len  Number of bytes to send.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes sent (should equal @p len).
-         *         - On failure: error message.
+         *
+         * @return
+         *   - `std::expected<size_t, std::string>`
+         *   - On success → number of bytes sent (normally == len)
+         *   - On failure → error message
+         *
+         * @note This is a high-level API returning errors via `expected`.
          */
+        [[nodiscard]]
         virtual std::expected<std::size_t, std::string>
         sendData(const void *data, std::size_t len) = 0;
 
         /**
-         * @brief Receive data from the socket.
-         * Retries until all requested bytes are read or an error occurs.
+         * @brief Receive bytes from the socket reliably.
          *
-         * @param data Pointer to the destination buffer.
-         * @param len  Buffer size in bytes.
-         * @return std::expected<std::size_t, std::string>
-         *         - On success: number of bytes received (should equal @p len).
-         *         - On failure: error message.
+         * @param data Destination buffer.
+         * @param len  Maximum number of bytes to read.
+         *
+         * @return
+         *   - On success → bytes read (normally == len)
+         *   - On failure → error message
          */
+        [[nodiscard]]
         virtual std::expected<std::size_t, std::string>
         recvData(void *data, std::size_t len) = 0;
 
     protected:
         /**
-         * @brief Apply a socket option.
-         * @param connSocket File descriptor of the socket.
-         * @param opt Option to apply.
+         * @brief Apply a low-level socket option.
          *
-         * @throw std::invalid_argument if @p opt is invalid.
-         * @throw std::runtime_error if the system call fails.
+         * @param connSocket The socket file descriptor.
+         * @param opt        Socket option to enable.
          *
-         * @note Still exception-based because it's a low-level helper,
-         *       not part of the high-level error-returning API.
+         * @throws std::invalid_argument On invalid option.
+         * @throws std::runtime_error   On system call failure.
+         *
+         * @note This function uses exceptions intentionally since it is
+         *       a low-level helper, not part of the public `expected` API.
          */
-        static void setOption(int connSocket, SocketOptions opt);
+        [[nodiscard]]
+        static std::expected<void, std::string>
+        setOption(int connSocket, SocketOptions opt) noexcept;
 
-        /// Network configuration for this socket (IP, port, etc.).
+        /// Network configuration for this socket.
         NodeNetworkConfig netcfg_;
 
-        /// Buffer for send/receive operations.
-        std::unique_ptr<uint8_t[]> buffer_;
+        /// Intermediate buffer for I/O operations.
+        std::unique_ptr<std::uint8_t[]> buffer_;
     };
-
-} // namespace otpq::network::sockets
+}
