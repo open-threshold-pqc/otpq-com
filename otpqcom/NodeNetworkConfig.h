@@ -1,61 +1,61 @@
 #pragma once
 
-#include <format>
 #include <string>
 #include <string_view>
 
 namespace otpq::network {
-
     /**
-     * \brief Represents the network configuration of a single node.
+     * @brief Represents the network configuration of a single node.
      *
-     * This class stores basic networking information for a node in the system:
-     * - a unique identifier (`id`)
-     * - an IP address (`ip`)
-     * - a base port number (`base_port`)
+     * Stores:
+     *  - An IP address (`ip`)
+     *  - A base port number (`base_port`)
      *
      * Example:
-     * \code
-     * int main(){
-     *  otpq::network::NodeNetworkConfig cfg(1, "127.0.0.1", 5000);
-     *  std::cout << cfg.id() << " -> " << cfg.ip() << ":" << cfg.base_port();
-     *}
-     * \endcode
+     * @code
+     * otpq::network::NodeNetworkConfig cfg{"127.0.0.1", 5000};
+     * std::cout << cfg.ip() << ":" << cfg.base_port();
+     * @endcode
      */
-    class NodeNetworkConfig {
+    class NodeNetworkConfig final {
     public:
-        /**
-         * \brief Construct a new NodeNetworkConfig.
-         *
-         * \param id Unique node identifier.
-         * \param ip IP address of the node.
-         * \param basePort Base port number to use for communication.
-         */
-        NodeNetworkConfig(int id, std::string_view ip, int basePort);
+        /// Create a new NodeNetworkConfig.
+        explicit NodeNetworkConfig(std::string_view ip, std::uint16_t basePort);
 
-        /// @return The unique node identifier.
-        [[nodiscard]] int id() const noexcept;
+        NodeNetworkConfig() = default;
+
+        ~NodeNetworkConfig() = default;
+
+        NodeNetworkConfig(const NodeNetworkConfig &) = default;
+
+        NodeNetworkConfig(NodeNetworkConfig &&) noexcept = default;
+
+        NodeNetworkConfig &operator=(const NodeNetworkConfig &) = default;
+
+        NodeNetworkConfig &operator=(NodeNetworkConfig &&) noexcept = default;
 
         /// @return The node's IP address.
-        [[nodiscard]] std::string_view ip() const noexcept;
+        [[nodiscard]] constexpr std::string_view ip() const noexcept {
+            return ip_;
+        }
 
         /// @return The node's base port.
-        [[nodiscard]] int base_port() const noexcept;
-
+        [[nodiscard]] constexpr std::uint16_t base_port() const noexcept {
+            return basePort_;
+        }
 
     private:
-        int id_;             ///< Unique node identifier.
-        std::string ip_;     ///< IP address of the node.
-        int basePort_;      ///< Base port number.
+        std::string ip_{}; ///< IP address.
+        std::uint16_t basePort_{}; ///< Base port (0 = disabled, or >= 1024).
     };
 
-
     /**
-     * \brief Check if a string is a valid IPv4 or IPv6 address.
+     * @brief Validate whether a string is an IPv4 or IPv6 address.
      *
-     * @param ip The IP address string to validate.
-     * @return true if valid, false otherwise.
+     * Uses `inet_pton` internally and performs no allocations.
+     *
+     * @param ip  IP string to validate.
+     * @return true if valid IPv4 or IPv6, false otherwise.
      */
-    [[nodiscard]] inline bool isValidIp(std::string_view ip) noexcept;
-
-} // namespace otpq::network
+    [[nodiscard]] bool isValidIp(std::string_view ip) noexcept;
+}
