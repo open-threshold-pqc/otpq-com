@@ -4,9 +4,9 @@
 #include <string>
 #include <unordered_map>
 
-#include <otpqcom/NetIO/MPChannel.h>
-#include <otpqcom/NetIO/ServerSocketChannel.h>
-#include <otpqcom/NetIO/ClientSocketChannel.h>
+#include <otpqcom/Sockets/MPChannel.h>
+#include <otpqcom/Sockets/ServerSocketChannel.h>
+#include <otpqcom/Sockets/ClientSocketChannel.h>
 #include <otpqcom/NodeNetworkConfig.h>
 
 namespace otpq::network {
@@ -118,9 +118,8 @@ namespace otpq::network {
         template<typename Func>
         auto withPeerSocket(int peerId, Func &&fn)
             -> decltype(fn(std::declval<sockets::ServerSocketChannel &>())) {
-            if (peerId == selfId_) {
+            if (peerId == selfId_)
                 return std::unexpected("[SocketMPCommunication] cannot target self");
-            }
 
             if (auto it = roleClientConnections_.find(peerId);
                 it != roleClientConnections_.end()) {

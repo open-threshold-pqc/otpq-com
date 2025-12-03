@@ -4,7 +4,6 @@
 
 
 namespace otpq::network {
-
     /**
      * @struct NetworkMetrics
      * @brief Tracks basic network I/O statistics for a socket or channel.
@@ -28,7 +27,5 @@ namespace otpq::network {
             bytesSent = 0;
             bytesReceived = 0;
         }
-
     };
-
-} // namespace otpq::network
+}

@@ -1,50 +1,53 @@
 #include <stdexcept>
 #include <format>
-#include <algorithm>
+#include <ranges>
+#include <utility>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include <otpqcom/NetIO/SocketChannel.h>
+#include <otpqcom/Sockets/SocketChannel.h>
+#include <otpqcom/NodeNetworkConfig.h>
 #include <otpqcom/NetworkConfig.h>
 
+
 namespace otpq::network::sockets {
-    SocketChannel::SocketChannel(NodeNetworkConfig cfg)
+    SocketChannel::SocketChannel(NodeNetConf cfg)
         : netcfg_{std::move(cfg)},
-          buffer_{std::make_unique<std::uint8_t[]>(NETWORK_IO_BUFFER_SIZE)} {
+          buffer_(std::make_unique<std::uint8_t[]>(NETWORK_IO_BUFFER_SIZE)) {
         std::ranges::fill_n(buffer_.get(), NETWORK_IO_BUFFER_SIZE, std::uint8_t{0});
     }
 
-    SocketChannel::~SocketChannel() = default;
-
     std::expected<void, std::string>
-    SocketChannel::setOption(const int connSocket, const SocketOptions opt) noexcept {
-        if (connSocket < 0)
-            return std::unexpected{"invalid socket descriptor (< 0)"};
+    SocketChannel::setOption(const int sockDesc, const helpers::SocketOptions opt) noexcept {
+        if (sockDesc < 0)
+            return std::unexpected{"[SocketChannel] invalid socket descriptor (<0)"};
 
         constexpr int enable = 1;
         constexpr int disable = 0;
 
-        auto apply = [&](int level, int name, const int *val, const char *desc)
+        auto apply = [&](int level, int optname, const int *value, std::string_view desc)
             -> std::expected<void, std::string> {
-            if (::setsockopt(connSocket, level, name, val, sizeof(*val)) < 0)
+            if (::setsockopt(sockDesc, level, optname, value, sizeof(*value)) < 0)
                 return std::unexpected{std::format("failed to set {}", desc)};
             return {};
         };
 
+        using enum helpers::SocketOptions;
+
         switch (opt) {
-            case SocketOptions::REUSEADDR:
+            case ReuseAddr:
                 return apply(SOL_SOCKET, SO_REUSEADDR, &enable, "SO_REUSEADDR");
 
-            case SocketOptions::SETDELAY:
+            case SetDelay:
                 return apply(IPPROTO_TCP, TCP_NODELAY, &disable, "TCP_NODELAY=0");
 
-            case SocketOptions::SETNODELAY:
+            case SetNoDelay:
                 return apply(IPPROTO_TCP, TCP_NODELAY, &enable, "TCP_NODELAY=1");
 
             default:
-                return std::unexpected{"unsupported socket option"};
+                return std::unexpected{"[SocketChannel] unsupported socket option"};
         }
     }
 }

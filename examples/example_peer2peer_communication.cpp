@@ -5,14 +5,11 @@
 #include <random>
 #include <chrono>
 
-#include <../src/include/otpqcom/NodeNetworkConfig.h>
-#include <NetIO/ClientSocketChannel.h>
-#include <NetIO/ServerSocketChannel.h>
-
-#include <gtest/gtest.h>
+#include <otpqcom/NodeNetworkConfig.h>
+#include <otpqcom/Sockets/ClientSocketChannel.h>
+#include <otpqcom/Sockets/ServerSocketChannel.h>
 
 using namespace otpq::network;
-
 
 constexpr int RANDOM_BROADCAST_MESSAGE_SIZE = 50;
 constexpr int REPLY_MESSAGE_SIZE = 10;
@@ -28,12 +25,12 @@ std::string randomMessage() {
 }
 
 void runServer() {
-    const NodeNetworkConfig cfg{"127.0.0.1", 9000};
-    sockets::ServerSocketChannel server{cfg};
+    const NodeNetConf servingConfig{"127.0.0.1", 9000};
+    sockets::ServerSocketChannel server{servingConfig};
 
-    std::cout << "[SERVER] Listening on " << cfg.ip() << ":" << cfg.port() << '\n';
+    std::cout << "[SERVER] Listening on " << servingConfig.ip() << ":" << servingConfig.port() << '\n';
 
-    if (auto r0 = server.awaitAndServe(); !r0) {
+    if (auto r0 = server.listenAndAccept(); !r0) {
         std::cerr << r0.error() << '\n';
         return;
     }
@@ -47,7 +44,7 @@ void runServer() {
     const std::string received(buffer.begin(), buffer.end());
     std::cout << "[SERVER] Received: " << received << '\n';
 
-    const std::string reply {"Server ACK"};
+    const std::string reply{"Server ACK"};
     if (auto r3 = server.sendData(reply.data(), reply.size()); !r3) {
         std::cerr << r3.error() << '\n';
         return;
@@ -62,45 +59,44 @@ void runServer() {
 }
 
 void runClient() {
-    sockets::ClientSocketChannel client{{"127.0.0.1"}};
+    sockets::ClientSocketChannel sock{NodeNetConf{"127.0.0.1"}};
+    NodeNetConf serverAddr{"127.0.0.1", 9000};
 
-    if (auto c0 = client.nodeConnect({"127.0.0.1", 9000}); !c0) {
+    if (auto c0 = sock.connect(serverAddr); !c0) {
         std::cerr << c0.error() << '\n';
         return;
     }
 
-    std::cout << "[CLIENT] Connected\n";
+    std::cout << "[CLIENT] Connected to the Server\n";
 
-    std::string message = randomMessage();
-    std::cout << "[CLIENT] Sending message: " << message << '\n';
+    const std::string message { randomMessage()};
+    std::cout << "[CLIENT] Sending a random message: " << message << '\n';
 
-    if (auto s1 = client.sendData(message.data(), message.size()); !s1) {
+    if (auto s1 = sock.sendData(message.data(), message.size()); !s1) {
         std::cerr << s1.error() << '\n';
         return;
     }
 
-    if (auto f0 = client.streamFlush(); !f0) {
+    if (auto f0 = sock.streamFlush(); !f0) {
         std::cerr << f0.error() << '\n';
         return;
     }
 
-    std::vector<char> buffer(REPLY_MESSAGE_SIZE);
-    auto r1 = client.recvData(buffer.data(), REPLY_MESSAGE_SIZE);
+    std::vector<uint8_t> buffer(REPLY_MESSAGE_SIZE);
+    auto r1 = sock.recvData(buffer.data(), REPLY_MESSAGE_SIZE);
     if (!r1) {
         std::cerr << r1.error() << '\n';
         return;
     }
 
-    std::string reply(buffer.data(), buffer.data() + *r1);
+    const std::string reply(buffer.data(), buffer.data() + *r1);
     std::cout << "[CLIENT] Received reply: " << reply << "\n";
 }
 
 int main() {
     std::thread serverThread(runServer);
-    std::this_thread::sleep_for(std::chrono::milliseconds{50});
     std::thread clientThread(runClient);
 
     serverThread.join();
     clientThread.join();
-
 }

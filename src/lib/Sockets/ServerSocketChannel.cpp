@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include <otpqcom/NetworkConfig.h>
-#include <otpqcom/NetIO/ServerSocketChannel.h>
+#include <otpqcom/Sockets/ServerSocketChannel.h>
 
 namespace otpq::network::sockets {
     ServerSocketChannel::ServerSocketChannel(NodeNetworkConfig cfg)
@@ -33,18 +33,18 @@ namespace otpq::network::sockets {
     }
 
     std::expected<void, std::string>
-    ServerSocketChannel::awaitConnection() const noexcept {
+    ServerSocketChannel::listen() const noexcept {
         if (::listen(listenSocket_, 1) < 0) {
             return std::unexpected(std::format(
                 "[ServerSocketChannel] listen() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                netcfg_.ip(), netcfg_.port()
             ));
         }
         return {};
     }
 
     std::expected<void, std::string>
-    ServerSocketChannel::acceptConnection() noexcept {
+    ServerSocketChannel::accept() noexcept {
         sockaddr_in peer{};
         socklen_t peerSize = sizeof(peer);
 
@@ -57,7 +57,7 @@ namespace otpq::network::sockets {
         if (connSocket_ < 0) {
             return std::unexpected(std::format(
                 "[ServerSocketChannel] accept() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                netcfg_.ip(), netcfg_.port()
             ));
         }
 
@@ -85,13 +85,13 @@ namespace otpq::network::sockets {
     }
 
     std::expected<void, std::string>
-    ServerSocketChannel::awaitAndServe() noexcept {
-        if (auto r = awaitConnection(); !r) return r;
-        return acceptConnection();
+    ServerSocketChannel::listenAndAccept() noexcept {
+        if (auto r = listen(); !r) return r;
+        return accept();
     }
 
     std::expected<void, std::string>
-    ServerSocketChannel::setBufferMode(NetworkBufferMode mode) const noexcept {
+    ServerSocketChannel::setBufferMode(IOBufferMode mode) const noexcept {
         if (!stream_) {
             return std::unexpected(
                 "[ServerSocketChannel] setBufferMode(): no IO stream (connection not accepted)"
@@ -193,22 +193,22 @@ namespace otpq::network::sockets {
         sockaddr_in serv{};
         serv.sin_family = AF_INET;
 
-        serv.sin_port = ::htons(netcfg_.basePort());
+        serv.sin_port = ::htons(netcfg_.port());
 
         listenSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
         if (listenSocket_ < 0) {
             throw std::runtime_error(std::format(
-                "[ServerSocketChannel] socket() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                "[ServerSocketChannel] socket(): failed ({}:{})",
+                netcfg_.ip(), netcfg_.port()
             ));
         }
 
         // Non-throwing expected-based API
-        if (auto r = setOption(listenSocket_, SocketOptions::REUSEADDR); !r) {
+        if (auto r = setOption(listenSocket_, helpers::SocketOptions::ReuseAddr); !r) {
             ::close(listenSocket_);
             listenSocket_ = -1;
             throw std::runtime_error(std::format(
-                "[ServerSocketChannel] setOption(REUSEADDR) failed: {}",
+                "[ServerSocketChannel] setOption(ReuseAddr): failed: {}",
                 r.error()
             ));
         }
@@ -222,7 +222,7 @@ namespace otpq::network::sockets {
             listenSocket_ = -1;
             throw std::runtime_error(std::format(
                 "[ServerSocketChannel] bind() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                netcfg_.ip(), netcfg_.port()
             ));
         }
     }

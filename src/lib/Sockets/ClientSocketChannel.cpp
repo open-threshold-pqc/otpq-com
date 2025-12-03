@@ -8,8 +8,7 @@
 #include <chrono>
 #include <algorithm>
 
-#include <otpqcom/NetIO/ClientSocketChannel.h>
-#include <otpqcom/NetworkConfig.h>
+#include <otpqcom/Sockets/ClientSocketChannel.h>
 
 namespace otpq::network::sockets {
     ClientSocketChannel::ClientSocketChannel(NodeNetworkConfig cfg)
@@ -31,7 +30,7 @@ namespace otpq::network::sockets {
 
 
     std::expected<void, std::string>
-    ClientSocketChannel::nodeConnect(const NodeNetworkConfig &cfg) noexcept {
+    ClientSocketChannel::connect(const NodeNetworkConfig &cfg) noexcept {
         sockaddr_in dest{};
         dest.sin_family = AF_INET;
 
@@ -41,7 +40,7 @@ namespace otpq::network::sockets {
             ));
         }
 
-        dest.sin_port = ::htons(cfg.basePort());
+        dest.sin_port = ::htons(cfg.port());
 
         // Retry until connection succeeds
         while (::connect(connSocket_,
@@ -71,7 +70,7 @@ namespace otpq::network::sockets {
     }
 
     std::expected<void, std::string>
-    ClientSocketChannel::setBufferMode(NetworkBufferMode mode) const noexcept {
+    ClientSocketChannel::setBufferMode(IOBufferMode mode) const noexcept {
         if (!stream_) {
             return std::unexpected(
                 "[ClientSocketChannel] setBufferMode(): no IO stream (connection not established)"
@@ -176,8 +175,8 @@ namespace otpq::network::sockets {
         connSocket_ = ::socket(AF_INET, SOCK_STREAM, 0);
         if (connSocket_ < 0) {
             throw std::runtime_error(std::format(
-                "[ClientSocketChannel] socket() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                "[ClientSocketChannel] socket(): failed ({}:{})",
+                netcfg_.ip(), netcfg_.port()
             ));
         }
 
@@ -193,13 +192,13 @@ namespace otpq::network::sockets {
             ));
         }
 
-        local.sin_port = ::htons(netcfg_.basePort());
+        local.sin_port = ::htons(netcfg_.port());
 
-        if (auto r = setOption(connSocket_, SocketOptions::REUSEADDR); !r) {
+        if (auto r = setOption(connSocket_, helpers::SocketOptions::ReuseAddr); !r) {
             ::close(connSocket_);
             connSocket_ = -1;
             throw std::runtime_error(std::format(
-                "[ClientSocketChannel] setOption(REUSEADDR) failed: {}",
+                "[ClientSocketChannel] setOption(REUSEADDR): failed: {}",
                 r.error()
             ));
         }
@@ -211,8 +210,8 @@ namespace otpq::network::sockets {
             ::close(connSocket_);
             connSocket_ = -1;
             throw std::runtime_error(std::format(
-                "[ClientSocketChannel] bind() failed ({}:{})",
-                netcfg_.ip(), netcfg_.basePort()
+                "[ClientSocketChannel] bind(): failed ({}:{})",
+                netcfg_.ip(), netcfg_.port()
             ));
         }
     }

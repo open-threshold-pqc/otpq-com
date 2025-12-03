@@ -7,21 +7,21 @@
 #include <iostream>
 #include <random>
 
-#include <otpqcom/NetIO/SocketMPChannel.h>
-#include <otpqcom/NodeNetworkConfig.h>
+#include <NetIO/SocketMPChannel.h>
+#include <../src/include/otpqcom/NodeNetworkConfig.h>
 
 using namespace otpq::network;
 
 
-constexpr int CLIENT_MESSAGE_SIZE = 50;
+constexpr int RANDOM_BROADCAST_MESSAGE_SIZE = 50;
 constexpr int REPLY_MESSAGE_SIZE = 50;
 
 std::string randomMessage() {
     static thread_local std::mt19937 rng{std::random_device{}()};
     static std::uniform_int_distribution<int> dist('A', 'Z');
     std::string s;
-    s.reserve(CLIENT_MESSAGE_SIZE);
-    for (int i = 0; i < CLIENT_MESSAGE_SIZE; ++i)
+    s.reserve(RANDOM_BROADCAST_MESSAGE_SIZE);
+    for (int i = 0; i < RANDOM_BROADCAST_MESSAGE_SIZE; ++i)
         s.push_back(static_cast<char>(dist(rng)));
     return s;
 }
