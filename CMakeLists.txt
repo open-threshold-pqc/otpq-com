@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(OTPQCOM LANGUAGES CXX)
+project(OTPQ-COM LANGUAGES CXX)
 
 # ================================================
 #  Project-wide compile settings (INTERFACE target)
@@ -16,7 +16,7 @@ set_property(CACHE NETWORK_BUFFER_MODE PROPERTY STRINGS FullyBuffered LineBuffer
 
 if (NOT NETWORK_BUFFER_SIZE MATCHES "^[0-9]+$")
     message(FATAL_ERROR "NETWORK_BUFFER_SIZE must be numeric, got '${NETWORK_BUFFER_SIZE}'")
-endif()
+endif ()
 
 message(STATUS "====================================================")
 message(STATUS "Configuring OTPQCOM")

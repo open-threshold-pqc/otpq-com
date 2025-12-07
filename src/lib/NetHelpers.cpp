@@ -12,4 +12,3 @@ namespace otpq::network::helpers {
                || (::inet_pton(AF_INET6, raw, &sa6.sin6_addr) == 1);
     }
 }
-
